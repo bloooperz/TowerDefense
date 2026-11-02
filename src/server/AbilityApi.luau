@@ -1,4 +1,5 @@
 -- Utility API handed to abilities. Abilities should only touch the game through this.
+local Net = require(game:GetService("ReplicatedStorage").Shared.Net)
 local Enemies = require(script.Parent.Enemies)
 local Combat = require(script.Parent.Combat)
 local World = require(script.Parent.World)
@@ -14,7 +15,7 @@ function Api.path()
 end
 
 function Api.enemies()
-	return Enemies.list
+	return Enemies.all() -- snapshot of LIVE enemies; check e.alive after each hit
 end
 
 function Api.enemiesInRange(pos, range, canHitAir)
@@ -40,6 +41,9 @@ end
 
 -- id: "slow" | "stun" | "burn"; params per StatusLogic.DEFS
 function Api.applyStatus(tower, e, id, params)
+	if not Enemies.targetable(e) then
+		return
+	end
 	params.source = params.source or tower.owner
 	Enemies.applyStatus(e, id, params)
 end
@@ -67,32 +71,10 @@ function Api.spawnPathMover(props, dist0, speed, height)
 	return p
 end
 
--- Pooled hit-scan beam.
-local FAR = CFrame.new(0, -500, 0)
-local pool = {}
+-- Hit-scan beam: drawn on clients (unreliable remote, fire-and-forget) instead of
+-- replicating 3 property writes per shot, which flooded replication on late waves.
 function Api.beam(from, to, color)
-	local b = table.remove(pool)
-	if not b then
-		b = World.part({
-			Name = "Shot",
-			Size = Vector3.new(0.3, 0.3, 1),
-			CanCollide = false,
-			CanQuery = false,
-			CanTouch = false,
-			Material = Enum.Material.Neon,
-			CFrame = FAR,
-		}, World.fx)
-	end
-	local dist = (to - from).Magnitude
-	b.Color = color or Color3.new(1, 1, 0)
-	b.Size = Vector3.new(0.3, 0.3, dist)
-	b.CFrame = CFrame.lookAt(from, to) * CFrame.new(0, 0, -dist / 2)
-	task.delay(0.08, function()
-		if b.Parent then
-			b.CFrame = FAR
-			table.insert(pool, b)
-		end
-	end)
+	Net.fireAll("Beam", from, to, color or Color3.new(1, 1, 0))
 end
 
 return Api

@@ -22,7 +22,9 @@ Net.DEFS = {
 	MatchState = { dir = "s2c" },
 	OpenMapSelect = { dir = "s2c" },
 	Results = { dir = "s2c" },
-	Notify = { dir = "s2c" }, -- (text, kind) toast; kind = "error" | "info"
+	Notify = { dir = "s2c" },
+	EnemyDied = { dir = "s2c" }, -- (enemyId) client hides instantly, before Destroy replicates
+	Beam = { dir = "s2c", unreliable = true }, -- (from, to, color) drawn client-side -- (text, kind) toast; kind = "error" | "info"
 }
 
 local folder
@@ -74,7 +76,7 @@ function Net.initServer()
 	folder = Instance.new("Folder")
 	folder.Name = "Remotes"
 	for name in pairs(Net.DEFS) do
-		local r = Instance.new("RemoteEvent")
+		local r = Instance.new(Net.DEFS[name].unreliable and "UnreliableRemoteEvent" or "RemoteEvent")
 		r.Name, r.Parent = name, folder
 		remotes[name] = r
 	end

@@ -36,8 +36,8 @@ function Ability:onTick(_dt)
 			dog.part:Destroy()
 			table.remove(self.dogs, i)
 		else
-			for e in pairs(api.enemies()) do
-				if not e.flying and not dog.hit[e] and math.abs(api.enemyDistance(e) - dist) <= cfg.dogRadius then
+			for _, e in ipairs(api.enemies()) do
+				if e.alive and not e.flying and not dog.hit[e] and math.abs(api.enemyDistance(e) - dist) <= cfg.dogRadius then
 					dog.hit[e] = true
 					api.damage(self.tower, e, cfg.dogDamage)
 					if e.alive then

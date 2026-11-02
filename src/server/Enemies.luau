@@ -6,6 +6,9 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local StatusLogic = require(Shared.StatusLogic)
 local World = require(script.Parent.World)
+local Net = require(Shared.Net)
+local EnemyLife = require(Shared.EnemyLife)
+local nextId = 0
 
 local Enemies = {}
 Enemies.list = {} -- [enemy] = true
@@ -62,10 +65,23 @@ local function healthBar(e)
 	e.bar, e.shieldBar = fill, shield
 end
 
+-- Quantized to 2% steps so constant chip damage / boss regen doesn't flood replication
+-- (that backlog is what delayed death replication on late waves).
+local function q(x)
+	return math.floor(math.clamp(x, 0, 1) * 50 + 0.5) / 50
+end
 function Enemies.updateBar(e)
-	if e.bar then
-		e.bar.Size = UDim2.fromScale(math.clamp(e.hp / e.maxHp, 0, 1), 1)
-		e.shieldBar.Size = UDim2.fromScale(e.maxShield > 0 and math.clamp(e.shield / e.maxShield, 0, 1) or 0, 0.4)
+	if e.bar and e.alive then
+		local h = q(e.hp / e.maxHp)
+		local s = e.maxShield > 0 and q(e.shield / e.maxShield) or 0
+		if h ~= e.barH then
+			e.barH = h
+			e.bar.Size = UDim2.fromScale(h, 1)
+		end
+		if s ~= e.barS then
+			e.barS = s
+			e.shieldBar.Size = UDim2.fromScale(s, 0.4)
+		end
 	end
 end
 
@@ -85,7 +101,9 @@ function Enemies.spawn(def, mods)
 		CanTouch = false,
 		Material = def.flying and Enum.Material.Neon or Enum.Material.SmoothPlastic,
 	}, nil)
+	nextId += 1
 	local e = {
+		id = nextId,
 		def = def,
 		part = p,
 		hp = def.hp * hpMult,
@@ -106,6 +124,7 @@ function Enemies.spawn(def, mods)
 	e.speed = e.baseSpeed
 	p:SetAttribute("Height", height)
 	p:SetAttribute("Enemy", true)
+	p:SetAttribute("EnemyId", e.id)
 	writeAttrs(e)
 	healthBar(e)
 	p.Parent = World.movers
@@ -121,21 +140,26 @@ function Enemies.applyStatus(e, id, params)
 	Enemies.checkpoint(e)
 end
 
+-- Removes an enemy from the world immediately (death or leak). Safe to call twice.
+-- e.alive may already be false (EnemyLife.hit marks death); list membership is the guard.
 function Enemies.remove(e)
-	if not e.alive then
-		return
-	end
 	e.alive = false
-	e.part:Destroy()
+	if not Enemies.list[e] then
+		return false
+	end
 	Enemies.list[e] = nil
+	Net.fireAll("EnemyDied", e.id)
+	e.part:Destroy()
+	return true
 end
+Enemies.targetable = EnemyLife.targetable
 
 -- Targeting: First (furthest along), Last, Strongest, Weakest, Closest.
 function Enemies.pick(pos, range, mode, canHitAir)
 	local best, bestScore = nil, -math.huge
 	local t = now()
 	for e in pairs(Enemies.list) do
-		if canHitAir ~= false or not e.flying then
+		if EnemyLife.targetable(e) and (canHitAir ~= false or not e.flying) then
 			local d = (Enemies.position(e) - pos).Magnitude
 			if d <= range then
 				local progress = Enemies.distance(e, t)
@@ -163,7 +187,18 @@ end
 function Enemies.inRange(pos, range, canHitAir)
 	local out = {}
 	for e in pairs(Enemies.list) do
-		if (canHitAir ~= false or not e.flying) and (Enemies.position(e) - pos).Magnitude <= range then
+		if EnemyLife.targetable(e) and (canHitAir ~= false or not e.flying) and (Enemies.position(e) - pos).Magnitude <= range then
+			table.insert(out, e)
+		end
+	end
+	return out
+end
+
+-- Snapshot of live enemies: safe to iterate while hits remove enemies.
+function Enemies.all()
+	local out = {}
+	for e in pairs(Enemies.list) do
+		if e.alive then
 			table.insert(out, e)
 		end
 	end
@@ -179,7 +214,7 @@ function Enemies.count()
 end
 
 function Enemies.clear()
-	for e in pairs(Enemies.list) do
+	for _, e in ipairs(Enemies.all()) do
 		Enemies.remove(e)
 	end
 end

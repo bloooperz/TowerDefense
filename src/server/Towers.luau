@@ -92,6 +92,9 @@ function Towers.place(unitId, pos, owner)
 end
 
 local function attack(t, target)
+	if not Enemies.targetable(target) then
+		return false
+	end
 	local pos = t.part.Position
 	Api.beam(pos, Enemies.position(target), t.unit.beamColor)
 	Api.damage(t, target, t.stats.damage, {
@@ -101,6 +104,7 @@ local function attack(t, target)
 	})
 	t.attacks += 1
 	hook(t, "onAttack", target)
+	return true
 end
 
 function Towers.tick(dt)

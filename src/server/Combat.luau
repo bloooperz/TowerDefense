@@ -5,6 +5,7 @@ local Damage = require(Shared.Damage)
 local StatusLogic = require(Shared.StatusLogic)
 local Enemies = require(script.Parent.Enemies)
 local Log = require(Shared.Log)
+local EnemyLife = require(Shared.EnemyLife)
 
 local Combat = {}
 Combat.stats = {} -- [player] = { damage, kills }
@@ -37,7 +38,7 @@ end
 -- source: { player?, tower?, mult?, armorPen?, critChance?, critMult?, dot? }
 -- Returns damage dealt to shield+hp.
 function Combat.damage(e, base, source)
-	if not e.alive or base <= 0 then
+	if not EnemyLife.targetable(e) or base <= 0 then
 		return 0
 	end
 	source = source or {}
@@ -49,14 +50,13 @@ function Combat.damage(e, base, source)
 		critMult = source.critMult,
 		roll = math.random(),
 	})
-	local before = e.hp + e.shield
-	e.shield, e.hp = Damage.applyToPools(amount, e.shield, e.hp)
-	local dealt = before - math.max(e.hp, 0) - e.shield
+	local dealt, killed = EnemyLife.hit(e, amount)
 	local s = statsFor(source.player)
 	if s then
 		s.damage += dealt
 	end
-	if e.hp <= 0 then
+	if killed then
+		-- alive=false already; destroy + notify clients now, before any other code runs
 		Enemies.remove(e)
 		if s then
 			s.kills += 1
@@ -76,15 +76,17 @@ function Combat.tick(dt)
 		return
 	end
 	local t = Enemies.now()
-	for e in pairs(Enemies.list) do
+	for _, e in ipairs(Enemies.all()) do
 		if StatusLogic.prune(e.status, t) then
 			Enemies.checkpoint(e)
 		end
 		for _, dot in ipairs(StatusLogic.dots(e.status, t)) do
+			if not e.alive then
+				break
+			end
 			Combat.damage(e, dot.dps * dt, { player = dot.source, dot = true })
 		end
-		if e.alive and e.regen > 0 and e.hp < e.maxHp then
-			e.hp = math.min(e.maxHp, e.hp + e.regen * dt)
+		if EnemyLife.regen(e, dt) then
 			Enemies.updateBar(e)
 		end
 		if e.alive and Enemies.distance(e, t) >= Enemies.path.length then
