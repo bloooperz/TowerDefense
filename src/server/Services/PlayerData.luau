@@ -130,7 +130,7 @@ local function replicate(plr, d)
 	plr:SetAttribute("Gold", d.gold or 0) -- placeholder until gold/rerolls exist in DataSchema
 	plr:SetAttribute("Rerolls", d.rerolls or 0)
 	plr:SetAttribute("SummonPity", d.summonPity or 0)
-	plr:SetAttribute("StarterChosen", d.starterChosen == true)
+	plr:SetAttribute("StarterChosen", d.starterChosen == true or next(d.units) ~= nil) -- owning units = already started
 	local st = Settings.sanitize(d.settings, Keybinds)
 	d.settings = st
 	plr:SetAttribute("Settings", HttpService:JSONEncode(st)) -- client applies on load / change
@@ -570,8 +570,14 @@ function PlayerData.devGiveUnit(plr, unitId)
 end
 
 function PlayerData.init()
+	local loading = {}
 	local function added(plr)
+		if loading[plr] or profiles[plr] then
+			return -- PlayerAdded + GetPlayers can both fire for one player; a 2nd load would replace live data
+		end
+		loading[plr] = true
 		local d, why = load(plr)
+		loading[plr] = nil
 		if not plr.Parent then
 			if d then -- left while loading: release the lock we just took
 				profiles[plr] = d

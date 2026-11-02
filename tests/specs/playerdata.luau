@@ -41,6 +41,7 @@ local function newEnv()
 		warn = function(...) table.insert(warns, table.concat({ ... }, " ")) end,
 		print = function() end,
 		Instance = { new = function() return { Event = signal, Fire = function() end } end },
+		task = { spawn = function(f, ...) return f(...) end, delay = function() end, wait = function() end },
 		Random = { new = function() return { NextNumber = function() return math.random() end } end },
 	}, { __index = _G })
 	local PD = luau.load(fs.readFile("src/server/Services/PlayerData.luau"), { debugName = "PlayerData", environment = env, injectGlobals = true })()
@@ -71,7 +72,7 @@ local function fakeStore(failN)
 end
 
 local function fakePlayer()
-	return { Name = "P", UserId = 1, Parent = true, kicked = nil, Kick = function(self, m) self.kicked = m end, SetAttribute = function() end, GetAttribute = function() end }
+	return { Name = "P", UserId = 1, Parent = true, kicked = nil, Kick = function(self, m) self.kicked = m end, attrs = {}, SetAttribute = function(self, k, v) self.attrs[k] = v end, GetAttribute = function(self, k) return self.attrs[k] end }
 end
 
 return function(t)
@@ -148,5 +149,44 @@ return function(t)
 		t.eq(plr2.kicked, nil)
 		assert(PD._test.profiles[plr2] and PD._test.profiles[plr2] ~= d, "fresh copy loaded")
 		t.eq(st.mem["u_1"].lock.job, PD._test.jobId)
+	end)
+	t.test("ClaimStarter end-to-end: new account -> Basic + 500 Gems, flag saved, survives reload", function()
+		local PD, warns = newEnv()
+		local Summon = require("../../src/shared/Summon")
+		local st = fakeStore(0); PD._test.setStore(st)
+		local plr = fakePlayer()
+		local d = PD._test.load(plr)
+		PD._test.profiles[plr] = d
+		t.eq(d.starterChosen, false); t.eq(next(d.units), nil, "new account owns nothing")
+		t.eq(PD.claimStarter(plr, "Mogumo"), "That isn't a starter unit")
+		t.eq(PD.claimStarter(plr, "Basic"), nil)
+		t.eq(plr.attrs.StarterChosen, true); t.eq(plr.attrs.Gems, 500); t.eq(plr.attrs.Loadout, "Basic")
+		t.eq(st.mem["u_1"].data.starterChosen, true, "saved immediately")
+		t.eq(st.mem["u_1"].data.gems, 500)
+		t.eq(PD.claimStarter(plr, "Basic"), "Starter already chosen")
+		t.eq(plr.attrs.Gems, 500, "no double grant")
+		-- rejoin: release + reload keeps the pick
+		t.eq(PD._test.save(plr, true), "ok")
+		local d2 = PD._test.load(plr)
+		t.eq(d2.starterChosen, true); t.eq(d2.gems, 500)
+		local n = 0
+		for _ in pairs(d2.units) do n += 1 end
+		t.eq(n, 1)
+		-- client decision: hidden once chosen / owns units / already seen done
+		t.eq(Summon.showStarter(false, false, false), true)
+		t.eq(Summon.showStarter(nil, false, false), false, "not loaded yet")
+		t.eq(Summon.showStarter(true, false, false), false)
+		t.eq(Summon.showStarter(false, true, false), false, "owns units")
+		t.eq(Summon.showStarter(false, false, true), false, "sticky after done")
+	end)
+	t.test("replicate never reports StarterChosen=false for an account that owns units", function()
+		local PD = newEnv()
+		local st = fakeStore(0); PD._test.setStore(st)
+		local plr = fakePlayer()
+		local d = PD._test.load(plr)
+		PD._test.profiles[plr] = d
+		d.units["x"] = { uid = "x", unitId = "Basic", level = 1, xp = 0 }
+		PD.devGiveGold(plr, 1)
+		t.eq(plr.attrs.StarterChosen, true)
 	end)
 end

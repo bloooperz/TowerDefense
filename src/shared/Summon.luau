@@ -208,6 +208,13 @@ function Summon.checkSell(d, uid: string, rarity: string?, placed): (string?, nu
 	return nil, Summon.SELL_GOLD[rarity or "Common"] or 0
 end
 
+-- Client starter-screen decision. chosen = StarterChosen attribute (nil = not loaded yet),
+-- ownsUnits = Inventory attribute is non-empty, seenDone = this session already saw it chosen.
+-- Only an explicit false on an account with no units shows it, and never again once done.
+function Summon.showStarter(chosen: boolean?, ownsUnits: boolean, seenDone: boolean): boolean
+	return chosen == false and not ownsUnits and not seenDone
+end
+
 -- Starter claim on a data table. Returns reason or nil, uid.
 function Summon.claimStarter(d, unitId: any, genUid, newUnit)
 	if d.starterChosen then
