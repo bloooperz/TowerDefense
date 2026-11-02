@@ -12,6 +12,8 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local DataSchema = require(Shared.DataSchema)
 local Rewards = require(Shared.Rewards)
+local Settings = require(Shared.Settings)
+local Keybinds = require(Shared.Keybinds)
 local Log = require(Shared.Log)
 local log = Log.new("PlayerData")
 
@@ -81,6 +83,9 @@ local function replicate(plr, d)
 	plr:SetAttribute("LoadoutLevels", table.concat(levels, ",")) -- parallel to Loadout
 	plr:SetAttribute("Gold", d.gold or 0) -- placeholder until gold/rerolls exist in DataSchema
 	plr:SetAttribute("Rerolls", d.rerolls or 0)
+	local st = Settings.sanitize(d.settings, Keybinds)
+	d.settings = st
+	plr:SetAttribute("Settings", HttpService:JSONEncode(st)) -- client applies on load / change
 	for _, fn in ipairs(changedListeners) do
 		task.spawn(Log.try, "PlayerData", "onChanged", fn, plr, d)
 	end
@@ -141,6 +146,29 @@ end
 
 function PlayerData.get(plr)
 	return profiles[plr]
+end
+
+-- Validate + store a settings JSON blob from the client. Returns an error string on failure.
+function PlayerData.saveSettings(plr, json)
+	local d = profiles[plr]
+	if not d then
+		return "Your data hasn't loaded yet"
+	end
+	local ok, raw = pcall(HttpService.JSONDecode, HttpService, json)
+	if not ok or type(raw) ~= "table" then
+		log.warn(plr.Name, "sent undecodable settings:", raw)
+		return "Settings save failed (bad data)"
+	end
+	local clean, problems = Settings.sanitize(raw, Keybinds)
+	if #problems > 0 then
+		log.warn(plr.Name, "settings problems:", table.concat(problems, "; "))
+	end
+	d.settings = clean
+	replicate(plr, d)
+	if #problems > 0 then
+		return ("Some settings were invalid and reset (%s)"):format(problems[1]):sub(1, 64)
+	end
+	return nil
 end
 
 function PlayerData.onChanged(fn)

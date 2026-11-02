@@ -13,6 +13,8 @@ local MapSelect = require(script.Parent.MapSelect)
 local Results = require(script.Parent.Results)
 local Toast = require(script.Parent.Toast)
 local LobbyUI = require(script.Parent.Lobby.LobbyUI)
+local Input = require(script.Parent.Input)
+local SettingsUI = require(script.Parent.Settings.SettingsUI)
 local Log = require(RS.Shared.Log)
 local log = Log.new("Client")
 log.info("client starting, build", require(RS.Shared.Config).BUILD, "server build", RS:WaitForChild("MatchInfo"):GetAttribute("Build"))
@@ -41,7 +43,7 @@ Net.listen("Notify", function(text, kind)
 	end
 	Toast.show(text, kind)
 end)
-for name, mod in pairs({ Hotbar = Hotbar, PathRenderer = PathRenderer, MapSelect = MapSelect, Results = Results, LobbyUI = LobbyUI, DevMenu = require(script.Parent.Dev.DevMenu) }) do
+for name, mod in pairs({ Hotbar = Hotbar, PathRenderer = PathRenderer, MapSelect = MapSelect, Results = Results, LobbyUI = LobbyUI, SettingsUI = SettingsUI, DevMenu = require(script.Parent.Dev.DevMenu) }) do
 	local ok = Log.try("Client", name .. ".init", mod.init)
 	if not ok then
 		Toast.show(name .. " failed to load (see Output)", "error")
@@ -50,6 +52,7 @@ end
 Net.listen("MatchState", function(s)
 	Hotbar.setState(s)
 	Hud.setState(s)
+	SettingsUI.setMatchState(s)
 	if s == "lobby" then
 		clear()
 		UnitPanel.close()
@@ -101,26 +104,23 @@ local function unitUnderMouse()
 	return nil
 end
 
-local keys = {
-	[Enum.KeyCode.One] = 1,
-	[Enum.KeyCode.Two] = 2,
-	[Enum.KeyCode.Three] = 3,
-	[Enum.KeyCode.Four] = 4,
-	[Enum.KeyCode.Five] = 5,
-	[Enum.KeyCode.Six] = 6,
-}
+-- Hotbar/cancel keys come from the central Input (rebindable in Settings > Controls).
+local HOTBAR = { hotbar1 = 1, hotbar2 = 2, hotbar3 = 3, hotbar4 = 4, hotbar5 = 5, hotbar6 = 6 }
 
 UIS.InputBegan:Connect(function(input, processed)
 	if input.KeyCode == Enum.KeyCode.Escape then
 		UnitPanel.close() -- Esc may be marked processed by Roblox, so check first
 		return
 	end
-	if processed then
+	if processed or Input.capturing then
 		return
 	end
-	if keys[input.KeyCode] then
-		select(keys[input.KeyCode])
-	elseif input.KeyCode == Enum.KeyCode.Q or input.UserInputType == Enum.UserInputType.MouseButton2 then
+	local act = input.UserInputType == Enum.UserInputType.Keyboard and Input.action(input.KeyCode)
+	if act == "settings" then
+		SettingsUI.toggle()
+	elseif act and HOTBAR[act] then
+		select(HOTBAR[act])
+	elseif act == "cancel" or input.UserInputType == Enum.UserInputType.MouseButton2 then
 		clear()
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1 and Placement.isSandbox() then
 		Log.try("Client", "sandbox place", Placement.commitSandbox)

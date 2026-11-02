@@ -27,6 +27,7 @@ local Match = {}
 Match.dev = { godMode = false, skipToken = 0 }
 local inMatch = {} -- [player] = true
 local votes = {}
+local restartVotes = {} -- [player] = true; separate from the start vote (see Settings > Restart)
 local state = "idle" -- idle | waiting | running | over
 local map, mode
 local baseHealth, wave, enemiesLeft, wavesCleared = Config.BASE_HEALTH, 0, 0, 0
@@ -82,6 +83,7 @@ local function moveTo(plr, pos)
 end
 
 local runWaves
+local openMatch
 
 local function tryStart()
 	if state == "waiting" and next(inMatch) then
@@ -140,6 +142,7 @@ local function leaveMatch(plr)
 	end
 	inMatch[plr] = nil
 	votes[plr] = nil
+	restartVotes[plr] = nil
 	plr:SetAttribute("Voted", false)
 	Towers.removeOwner(plr)
 	Cash.setVisible(plr, false)
@@ -160,6 +163,7 @@ local function resetMatch()
 	end
 	table.clear(inMatch)
 	table.clear(votes)
+	table.clear(restartVotes)
 	EnemySim.clear()
 	Towers.clear()
 	Combat.resetStats()
@@ -171,6 +175,21 @@ local function resetMatch()
 	info:SetAttribute("WaveTotal", 0)
 	World.portalLabel.Text = "Step in to play!"
 	sync()
+end
+
+function openMatch(m, md)
+	local ok, path = Log.try("Match", "buildMap " .. m.id, World.buildMap, m)
+	if not ok then
+		World.clearMap()
+		return "Failed to build map"
+	end
+	map, mode = m, md
+	EnemySim.setPath(path, map.id)
+	state = "waiting"
+	World.portalLabel.Text = ("%s (%s) - step in to join!"):format(map.name, mode.name)
+	startCountdown()
+	sync()
+	return nil
 end
 
 local function chooseMap(plr, mapId, modeId)
@@ -187,20 +206,40 @@ local function chooseMap(plr, mapId, modeId)
 	if not md then
 		return "Unknown mode " .. modeId
 	end
-	local ok, path = Log.try("Match", "buildMap " .. mapId, World.buildMap, m)
-	if not ok then
-		World.clearMap()
-		return "Failed to build map"
+	local err = openMatch(m, md)
+	if err then
+		return err
 	end
-	map, mode = m, md
-	EnemySim.setPath(path, map.id)
 	offeredAt[plr] = nil
 	log.info(plr.Name, "opened match", map.id, mode.id)
-	state = "waiting"
-	World.portalLabel.Text = ("%s (%s) - step in to join!"):format(map.name, mode.name)
-	startCountdown()
-	sync()
 	return joinMatch(plr)
+end
+
+-- Restart: same map + mode, same players, fresh state (back to "waiting" -> normal start vote/countdown).
+local function restartMatch()
+	local players, m, md = {}, map, mode
+	for plr in pairs(inMatch) do
+		table.insert(players, plr)
+	end
+	log.info("restarting", m.id, md.id, "with", #players, "players")
+	resetMatch()
+	local err = openMatch(m, md)
+	if err then
+		for _, plr in ipairs(players) do
+			Net.fire("Notify", plr, "Restart failed: " .. err, "error")
+		end
+		return
+	end
+	for _, plr in ipairs(players) do
+		if plr.Parent then
+			local e = joinMatch(plr)
+			if e then
+				Net.fire("Notify", plr, e, "error")
+			else
+				Net.fire("Notify", plr, "Match restarted", "info")
+			end
+		end
+	end
 end
 
 local function finish(won)
@@ -259,6 +298,10 @@ end
 local function runWavesInner()
 	state = "running"
 	matchToken += 1
+	local myToken = matchToken
+	local function live()
+		return alive() and matchToken == myToken
+	end
 	startedAt = os.clock()
 	info:SetAttribute("Countdown", 0)
 	World.portalLabel.Text = "Match in progress..."
@@ -266,7 +309,7 @@ local function runWavesInner()
 		Net.fire("MatchState", plr, "running")
 	end
 	sync()
-	while alive() do
+	while live() do
 		wave += 1
 		local w = (map.waves and map.waves[wave]) or Waves.generate(wave, { hpScale = mode.hpScale, maxWaves = mode.maxWaves })
 		enemiesLeft = w.total
@@ -280,7 +323,7 @@ local function runWavesInner()
 			end
 			local def = Enemies.get(g.enemy)
 			for _ = 1, g.count do
-				if not alive() or Match.dev.skipToken ~= skipAt then
+				if not live() or Match.dev.skipToken ~= skipAt then
 					break
 				end
 				if def then
@@ -294,8 +337,8 @@ local function runWavesInner()
 		end
 		repeat
 			task.wait(0.25)
-		until EnemySim.count() == 0 or not alive()
-		if not alive() then
+		until EnemySim.count() == 0 or not live()
+		if not live() then
 			break
 		end
 		wavesCleared = wave
@@ -304,6 +347,9 @@ local function runWavesInner()
 			break
 		end
 		task.wait(Config.WAVE_BREAK)
+	end
+	if matchToken ~= myToken then
+		return -- restarted/reset while we were running; the new match owns state now
 	end
 	EnemySim.clear()
 	if not next(inMatch) then
@@ -474,6 +520,44 @@ function Match.init(infoFolder)
 			return "Voting is closed"
 		end
 		setVote(plr, not votes[plr])
+		return nil
+	end)
+
+	-- Settings > Restart. Solo: immediate. Multiplayer: simple majority (> half) of players in the match;
+	-- clicking again withdraws your vote. Votes clear on reset/restart and when a voter leaves.
+	Net.on("SaveSettings", function(plr, json)
+		return PlayerData.saveSettings(plr, json)
+	end)
+
+	Net.on("RequestRestart", function(plr)
+		if not inMatch[plr] then
+			return "Only in a match"
+		end
+		if not map or not mode then
+			return "Nothing to restart"
+		end
+		restartVotes[plr] = not restartVotes[plr] or nil
+		local n, need = count(restartVotes), math.floor(count(inMatch) / 2) + 1
+		if n >= need then
+			restartMatch()
+			return nil
+		end
+		for p in pairs(inMatch) do
+			Net.fire("Notify", p, ("%s %s restart (%d/%d)"):format(plr.Name, restartVotes[plr] and "voted to" or "withdrew", n, need), "info")
+		end
+		return nil
+	end)
+
+	-- Settings > Leave: allowed in any state; leaveMatch removes the player's towers.
+	Net.on("LeaveMatch", function(plr)
+		if not inMatch[plr] then
+			return "Only in a match"
+		end
+		restartVotes[plr] = nil
+		leaveMatch(plr)
+		if not next(inMatch) then
+			resetMatch()
+		end
 		return nil
 	end)
 

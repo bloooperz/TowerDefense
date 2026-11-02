@@ -41,7 +41,7 @@ function Panel.current()
 	return current
 end
 game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
-	if input.KeyCode == Enum.KeyCode.Escape and not gpe then
+	if input.KeyCode == Enum.KeyCode.Escape and not gpe and not Panel.blockEsc then -- blockEsc: rebind capture eats Esc
 		Panel.closeCurrent()
 	end
 end)

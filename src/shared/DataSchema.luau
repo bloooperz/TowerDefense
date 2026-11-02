@@ -4,7 +4,7 @@
 -- and update DataSchema.default. reconcile() fills any missing fields from defaults.
 local DataSchema = {}
 
-DataSchema.VERSION = 2
+DataSchema.VERSION = 3
 
 local function deepCopy(t)
 	if type(t) ~= "table" then
@@ -35,6 +35,7 @@ function DataSchema.default(genUid, starter: { string })
 		loadout = {}, -- array of uids (max Config.LOADOUT_SIZE)
 		stats = { matches = 0, wins = 0, kills = 0, damage = 0, wavesCleared = 0, bestWave = 0 },
 		clears = {}, -- ["Map:Mode"] = true (first-clear tracking)
+		settings = {}, -- v3: validated by shared/Settings.sanitize (has its own .version)
 	}
 	for _, id in ipairs(starter) do
 		local uid = genUid()
@@ -60,6 +61,12 @@ DataSchema.MIGRATIONS = {
 			end
 		end
 		d.owned = nil
+	end,
+	-- v2 -> v3: player settings blob
+	[2] = function(d)
+		if type(d.settings) ~= "table" then
+			d.settings = {}
+		end
 	end,
 }
 

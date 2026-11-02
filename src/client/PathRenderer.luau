@@ -4,6 +4,7 @@
 local RS = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Maps = require(RS:WaitForChild("Shared"):WaitForChild("Maps"))
+local ClientSettings = require(script.Parent.Settings.ClientSettings)
 
 local Net = require(RS.Shared.Net)
 
@@ -36,6 +37,9 @@ function PathRenderer.init()
 	-- Beams: pooled, client-side only.
 	local pool = {}
 	Net.listen("Beam", function(from, to, color)
+		if ClientSettings.get().lowGraphics then
+			return -- Settings > Low graphics: skip shot beams
+		end
 		local b = table.remove(pool)
 		if not b then
 			b = Instance.new("Part")

@@ -16,7 +16,7 @@ local Placement = require(script.Parent.Parent.Placement)
 
 local log = Log.new("DevMenu")
 local DevMenu = {}
-local KEY = Enum.KeyCode.F2
+local Input = require(script.Parent.Parent.Input) -- "dev" action, default F2
 local BG, ROW = Color3.fromRGB(28, 28, 36), Color3.fromRGB(45, 45, 58)
 
 local function btn(text, color, parent, order)
@@ -171,7 +171,7 @@ local function build()
 	end
 	corner.Activated:Connect(toggle)
 	UIS.InputBegan:Connect(function(i, gpe)
-		if i.KeyCode == KEY and not gpe then
+		if not gpe and Input.action(i.KeyCode) == "dev" then
 			toggle()
 		end
 	end)

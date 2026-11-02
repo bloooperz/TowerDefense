@@ -5,6 +5,7 @@ local Damage = require(Shared.Damage)
 local StatusLogic = require(Shared.StatusLogic)
 local Enemies = require(script.Parent.Enemies)
 local Log = require(Shared.Log)
+local Net = require(Shared.Net)
 local EnemyLife = require(Shared.EnemyLife)
 
 local Combat = {}
@@ -42,7 +43,7 @@ function Combat.damage(e, base, source)
 		return 0
 	end
 	source = source or {}
-	local amount = Damage.compute(base, {
+	local amount, crit = Damage.compute(base, {
 		mult = source.mult,
 		armor = e.armor,
 		armorPen = source.armorPen,
@@ -51,6 +52,13 @@ function Combat.damage(e, base, source)
 		roll = math.random(),
 	})
 	local dealt, killed = EnemyLife.hit(e, amount)
+	-- Floating damage numbers: direct hits only (not DoT ticks), to the attacker; client hides if setting off.
+	if dealt > 0 and not source.dot and typeof(source.player) == "Instance" and source.player:IsA("Player") then
+		local okPos, pos = pcall(Enemies.position, e)
+		if okPos then
+			Net.fire("DamageNumber", source.player, pos, math.floor(dealt + 0.5), crit == true)
+		end
+	end
 	local s = statsFor(source.player)
 	if s then
 		s.damage += dealt

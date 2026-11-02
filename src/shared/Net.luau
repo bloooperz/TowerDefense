@@ -20,6 +20,10 @@ Net.DEFS = {
 	JoinMatch = { dir = "c2s", args = {}, rate = 2 },
 	RequestPlay = { dir = "c2s", args = {}, rate = 2 }, -- lobby Play button = stepping into the portal
 	ReturnToLobby = { dir = "c2s", args = {}, rate = 2 },
+	LeaveMatch = { dir = "c2s", args = {}, rate = 2 }, -- settings: leave any time (towers removed)
+	RequestRestart = { dir = "c2s", args = {}, rate = 2 }, -- settings: solo = immediate, multi = vote
+	SaveSettings = { dir = "c2s", args = { "string" }, rate = 2, maxLen = 4000 }, -- JSON, server-validated
+	DamageNumber = { dir = "s2c", unreliable = true }, -- (pos, amount, crit) to the attacking player
 	MatchState = { dir = "s2c" },
 	OpenMapSelect = { dir = "s2c" },
 	Results = { dir = "s2c" },
@@ -36,14 +40,14 @@ Net.DEFS = {
 local folder
 local remotes = {}
 
-local function bad(v)
+local function bad(v, maxLen)
 	local t = typeof(v)
 	if t == "number" then
 		return v ~= v or v == math.huge or v == -math.huge
 	elseif t == "Vector3" then
 		return bad(v.X) or bad(v.Y) or bad(v.Z)
 	elseif t == "string" then
-		return #v > 64
+		return #v > (maxLen or 64)
 	end
 	return false
 end
@@ -55,7 +59,7 @@ function Net.validate(def, ...)
 	end
 	for i, want in ipairs(def.args) do
 		local v = select(i, ...)
-		if typeof(v) ~= want or bad(v) then
+		if typeof(v) ~= want or bad(v, def.maxLen) then
 			return false, ("arg %d: expected %s, got %s"):format(i, want, typeof(v))
 		end
 	end

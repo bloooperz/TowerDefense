@@ -42,7 +42,13 @@ local CURRENCIES = { -- placeholder until Gold/Rerolls exist in DataSchema
 }
 
 local screen, panels, hotbar, levelFill, levelText = nil, {}, nil, nil, nil
-local actions, keyMap = {}, {}
+local actions, keyMap, keyLabels = {}, {}, {}
+local Input = require(script.Parent.Parent.Input)
+Input.onChanged(function()
+	for name, lbl in pairs(keyLabels) do
+		lbl.Text = Input.keyFor(name) or ""
+	end
+end)
 
 local function openPanel(name)
 	panels[name].toggle() -- Panel manager closes whatever else is open
@@ -92,13 +98,19 @@ local function sidePanel(list, anchorX, posX)
 	Theme.make("UIPadding", { PaddingTop = UDim.new(0, 12), PaddingLeft = UDim.new(0, 12) }, f)
 	Theme.make("UIGridLayout", { CellSize = UDim2.fromOffset(84, 84), CellPadding = UDim2.fromOffset(12, 12), SortOrder = Enum.SortOrder.LayoutOrder }, f)
 	for i, def in ipairs(list) do
+		local keyName = Input.keyFor(def.name) or def.key
 		local h = Button.new({
-			name = def.name, icon = def.icon, key = def.key, isNew = def.isNew,
+			name = def.name, icon = def.icon, key = keyName, isNew = def.isNew,
 			color = Theme.COLORS[def.name],
 			onClick = actions[def.name],
 		}, f)
 		h.LayoutOrder = i
-		keyMap[Enum.KeyCode[def.key]] = def.name
+		keyMap[def.name] = true -- shortcut keys resolved through Input (rebindable)
+		for _, d in ipairs(h:GetDescendants()) do
+			if d:IsA("TextLabel") and d.Text == keyName and d.Size == UDim2.fromOffset(20, 20) then
+				keyLabels[def.name] = d
+			end
+		end
 	end
 end
 
@@ -232,8 +244,8 @@ function LobbyUI.init()
 		if gpe or not screen.Enabled then
 			return
 		end
-		local name = keyMap[input.KeyCode]
-		if name then
+		local name = Input.action(input.KeyCode)
+		if name and keyMap[name] then
 			Log.try("Lobby", "shortcut " .. name, actions[name])
 		end
 	end)
