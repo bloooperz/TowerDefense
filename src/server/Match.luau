@@ -1,4 +1,7 @@
--- Match flow: portal -> map, START button, waves, game over -> lobby.
+-- Match flow: portal -> map, vote start / countdown, waves, game over -> lobby.
+-- Global match info is replicated through attributes on ReplicatedStorage.MatchInfo:
+--   MatchState, Wave, WaveTotal, EnemiesLeft, BaseHP, BaseMaxHP, Countdown, Votes, InMatch
+-- Each player's own vote is the "Voted" attribute on their Player.
 local Players = game:GetService("Players")
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 local World = require(script.Parent.World)
@@ -7,12 +10,29 @@ local Towers = require(script.Parent.Towers)
 
 local Match = {}
 local inMatch = {} -- [player] = true
+local votes = {} -- [player] = true
 local state = "idle" -- idle | waiting | running
-local baseHealth, wave = Config.BASE_HEALTH, 0
-local remotes
+local baseHealth, wave, enemiesLeft = Config.BASE_HEALTH, 0, 0
+local matchToken = 0 -- bumps on reset so old countdowns stop
+local remotes, info
 
-local function updateLabel(text)
-	World.baseLabel.Text = text or ("Wave " .. wave .. " | Base HP: " .. baseHealth)
+local function count(t)
+	local n = 0
+	for _ in pairs(t) do
+		n += 1
+	end
+	return n
+end
+
+local function sync()
+	info:SetAttribute("MatchState", state)
+	info:SetAttribute("Wave", wave)
+	info:SetAttribute("EnemiesLeft", enemiesLeft)
+	info:SetAttribute("BaseHP", baseHealth)
+	info:SetAttribute("BaseMaxHP", Config.BASE_HEALTH)
+	info:SetAttribute("Votes", count(votes))
+	info:SetAttribute("InMatch", count(inMatch))
+	World.baseLabel.Text = "HP " .. math.max(baseHealth, 0) .. "/" .. Config.BASE_HEALTH
 end
 
 local function getCash(plr)
@@ -37,6 +57,41 @@ local function moveTo(plr, pos)
 	end
 end
 
+local runWaves -- forward declared
+
+local function tryStart()
+	if state == "waiting" and next(inMatch) then
+		task.spawn(runWaves)
+	end
+end
+
+local function startCountdown()
+	matchToken += 1
+	local token = matchToken
+	task.spawn(function()
+		for t = Config.VOTE_COUNTDOWN, 0, -1 do
+			if token ~= matchToken or state ~= "waiting" then
+				return
+			end
+			info:SetAttribute("Countdown", t)
+			if t == 0 then
+				tryStart()
+				return
+			end
+			task.wait(1)
+		end
+	end)
+end
+
+local function setVote(plr, v)
+	votes[plr] = v or nil
+	plr:SetAttribute("Voted", v)
+	sync()
+	if state == "waiting" and next(inMatch) and count(votes) >= count(inMatch) then
+		tryStart()
+	end
+end
+
 local function joinMatch(plr)
 	if inMatch[plr] or state == "running" then
 		return
@@ -44,45 +99,58 @@ local function joinMatch(plr)
 	inMatch[plr] = true
 	if state == "idle" then
 		state = "waiting"
+		startCountdown()
 	end
+	plr:SetAttribute("Voted", false)
 	local c = getCash(plr)
 	if c then
 		c.Value = Config.START_CASH
 	end
 	moveTo(plr, Config.MAP_SPAWN)
 	remotes.MatchState:FireClient(plr, state)
+	sync()
 end
 
 local function resetMatch()
+	matchToken += 1
 	for plr in pairs(inMatch) do
 		moveTo(plr, Config.LOBBY_SPAWN)
+		plr:SetAttribute("Voted", false)
 		remotes.MatchState:FireClient(plr, "lobby")
 	end
 	table.clear(inMatch)
+	table.clear(votes)
 	Enemies.clear()
 	Towers.clear()
-	baseHealth, wave = Config.BASE_HEALTH, 0
+	baseHealth, wave, enemiesLeft = Config.BASE_HEALTH, 0, 0
 	state = "idle"
+	info:SetAttribute("Countdown", 0)
+	info:SetAttribute("WaveTotal", 0)
 	World.portalLabel.Text = "Step in to play!"
-	updateLabel()
+	sync()
 end
 
-local function runWaves()
+function runWaves()
 	state = "running"
+	matchToken += 1 -- stop countdown
+	info:SetAttribute("Countdown", 0)
 	World.portalLabel.Text = "Match in progress..."
 	for plr in pairs(inMatch) do
 		remotes.MatchState:FireClient(plr, "running")
 	end
+	sync()
 	while baseHealth > 0 and next(inMatch) do
 		wave += 1
-		updateLabel()
-		local info = Config.waveInfo(wave)
-		for _ = 1, info.count do
+		local w = Config.waveInfo(wave)
+		enemiesLeft = w.count
+		info:SetAttribute("WaveTotal", w.count)
+		sync()
+		for _ = 1, w.count do
 			if baseHealth <= 0 or not next(inMatch) then
 				break
 			end
-			Enemies.spawn(info.hp, info.speed)
-			task.wait(info.spawnDelay)
+			Enemies.spawn(w.hp, w.speed)
+			task.wait(w.spawnDelay)
 		end
 		repeat
 			task.wait(0.5)
@@ -90,27 +158,33 @@ local function runWaves()
 		if baseHealth <= 0 or not next(inMatch) then
 			break
 		end
-		payMatch(info.bonus)
+		payMatch(w.bonus)
 		task.wait(Config.WAVE_BREAK)
 	end
 	if baseHealth <= 0 then
-		updateLabel("GAME OVER - survived " .. (wave - 1) .. " waves")
+		World.baseLabel.Text = "GAME OVER"
+		info:SetAttribute("MatchState", "over")
 		task.wait(4)
 	end
 	resetMatch()
 end
 
-function Match.init(r)
-	remotes = r
+function Match.init(r, infoFolder)
+	remotes, info = r, infoFolder
 
 	Enemies.onLeak = function()
 		baseHealth -= 1
-		updateLabel()
+		enemiesLeft = math.max(enemiesLeft - 1, 0)
+		sync()
 	end
 	Enemies.onKill = function()
 		payMatch(Config.KILL_REWARD)
+		enemiesLeft = math.max(enemiesLeft - 1, 0)
+		info:SetAttribute("EnemiesLeft", enemiesLeft)
 	end
-	updateLabel()
+	info:SetAttribute("WaveTotal", 0)
+	info:SetAttribute("Countdown", 0)
+	sync()
 
 	Players.PlayerAdded:Connect(function(plr)
 		local ls = Instance.new("Folder")
@@ -129,8 +203,14 @@ function Match.init(r)
 	end)
 	Players.PlayerRemoving:Connect(function(plr)
 		inMatch[plr] = nil
-		if state == "waiting" and not next(inMatch) then
-			resetMatch()
+		votes[plr] = nil
+		sync()
+		if state == "waiting" then
+			if not next(inMatch) then
+				resetMatch()
+			elseif count(votes) >= count(inMatch) then
+				tryStart()
+			end
 		end
 	end)
 
@@ -152,9 +232,10 @@ function Match.init(r)
 		end
 	end)
 
+	-- StartGame now toggles this player's vote.
 	remotes.StartGame.OnServerEvent:Connect(function(plr)
 		if inMatch[plr] and state == "waiting" then
-			task.spawn(runWaves)
+			setVote(plr, not votes[plr])
 		end
 	end)
 
@@ -174,7 +255,7 @@ function Match.init(r)
 		if not Config.isValidPlacement(pos, u.size) or Towers.overlaps(pos, u.size) then
 			return
 		end
-		if u.unique and Towers.countFor(plr, index) >= 1 then
+		if Towers.countFor(plr, index) >= Config.maxPlaced(u) then
 			return
 		end
 		cash.Value -= u.cost
@@ -213,6 +294,13 @@ function Match.init(r)
 			return
 		end
 		cash.Value += Towers.sell(t)
+	end)
+
+	remotes.SetTargeting.OnServerEvent:Connect(function(plr, id, mode)
+		local t = ownedTower(plr, id)
+		if t and typeof(mode) == "string" and table.find(Config.TARGET_MODES, mode) then
+			t.part:SetAttribute("Targeting", mode)
+		end
 	end)
 end
 

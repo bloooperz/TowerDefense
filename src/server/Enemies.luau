@@ -71,6 +71,34 @@ function Enemies.closest(pos, range)
 	return best
 end
 
+-- Targeting modes: First (furthest along), Last, Strongest, Weakest, Closest.
+function Enemies.pick(pos, range, mode)
+	local best, bestScore = nil, -math.huge
+	local now = os.clock()
+	for e in pairs(Enemies.list) do
+		local d = (Enemies.position(e) - pos).Magnitude
+		if d <= range then
+			local progress = (now - e.t0) * e.speed
+			local score
+			if mode == "Last" then
+				score = -progress
+			elseif mode == "Strongest" then
+				score = e.hp
+			elseif mode == "Weakest" then
+				score = -e.hp
+			elseif mode == "Closest" then
+				score = -d
+			else -- First
+				score = progress
+			end
+			if score > bestScore then
+				best, bestScore = e, score
+			end
+		end
+	end
+	return best
+end
+
 function Enemies.clear()
 	for e in pairs(Enemies.list) do
 		remove(e)

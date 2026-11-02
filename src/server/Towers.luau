@@ -70,6 +70,7 @@ function Towers.place(unitIndex, pos, owner)
 	p:SetAttribute("OwnerId", owner and owner.UserId or 0)
 	p:SetAttribute("Level", 1)
 	p:SetAttribute("Spent", t.spent)
+	p:SetAttribute("Targeting", "First")
 
 	local bb = Instance.new("BillboardGui")
 	bb.Name, bb.Size, bb.StudsOffsetWorldSpace = "LevelTag", UDim2.fromOffset(60, 22), Vector3.new(0, u.size / 2 + 1.5, 0)
@@ -90,7 +91,7 @@ function Towers.place(unitIndex, pos, owner)
 	task.spawn(function()
 		while t.alive do
 			local st = t.stats
-			local target = Enemies.closest(p.Position, st.range)
+			local target = Enemies.pick(p.Position, st.range, p:GetAttribute("Targeting"))
 			if target then
 				shoot(p.Position, Enemies.position(target))
 				Enemies.damage(target, st.damage)

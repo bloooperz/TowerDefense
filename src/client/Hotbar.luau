@@ -1,31 +1,18 @@
--- Hotbar of units + START button.
+-- Hotbar of units with placed/max counts.
 local Players = game:GetService("Players")
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+local MyUnits = require(script.Parent.MyUnits)
 
 local Hotbar = {}
 local slots = {}
 Hotbar.onSelect = nil -- function(index)
-Hotbar.onStart = nil -- function()
+local counts = {}
 
 function Hotbar.init()
 	local player = Players.LocalPlayer
 	local screen = Instance.new("ScreenGui")
 	screen.Name, screen.ResetOnSpawn = "TDGui", false
 	screen.Parent = player:WaitForChild("PlayerGui")
-
-	local startBtn = Instance.new("TextButton")
-	startBtn.AnchorPoint, startBtn.Position = Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 20)
-	startBtn.Size, startBtn.Text, startBtn.TextScaled = UDim2.fromOffset(220, 60), "START", true
-	startBtn.BackgroundColor3, startBtn.TextColor3 = Color3.fromRGB(0, 170, 80), Color3.new(1, 1, 1)
-	startBtn.Visible = false
-	Instance.new("UICorner", startBtn).CornerRadius = UDim.new(0, 12)
-	startBtn.MouseButton1Click:Connect(function()
-		if Hotbar.onStart then
-			Hotbar.onStart()
-		end
-	end)
-	startBtn.Parent = screen
-	Hotbar.startBtn = startBtn
 
 	local bar = Instance.new("Frame")
 	bar.AnchorPoint, bar.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -20)
@@ -48,9 +35,24 @@ function Hotbar.init()
 				Hotbar.onSelect(i)
 			end
 		end)
+		b.Font = Enum.Font.FredokaOne
+		local c = Instance.new("TextLabel")
+		c.AnchorPoint, c.Position, c.Size = Vector2.new(1, 0), UDim2.new(1, -4, 0, 2), UDim2.fromOffset(34, 16)
+		c.BackgroundTransparency, c.TextScaled, c.Font = 1, true, Enum.Font.FredokaOne
+		c.TextColor3 = Color3.fromRGB(200, 200, 210)
+		c.Parent = b
+		counts[i] = c
 		b.Parent = bar
 		slots[i] = stroke
 	end
+	task.spawn(function()
+		while true do
+			if bar.Visible then
+				Hotbar.refreshCounts()
+			end
+			task.wait(0.3)
+		end
+	end)
 end
 
 function Hotbar.highlight(index)
@@ -59,9 +61,17 @@ function Hotbar.highlight(index)
 	end
 end
 
+function Hotbar.refreshCounts()
+	for i, u in ipairs(Config.UNITS) do
+		local n, max = MyUnits.count(i), Config.maxPlaced(u)
+		counts[i].Text = n .. "/" .. max
+		counts[i].TextColor3 = n >= max and Color3.fromRGB(255, 90, 90) or Color3.fromRGB(200, 200, 210)
+	end
+end
+
 function Hotbar.setState(s)
 	Hotbar.bar.Visible = (s ~= "lobby")
-	Hotbar.startBtn.Visible = (s == "waiting")
+	Hotbar.refreshCounts()
 end
 
 return Hotbar

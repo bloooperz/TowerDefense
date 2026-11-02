@@ -6,6 +6,7 @@ local Config = require(RS:WaitForChild("Shared"):WaitForChild("Config"))
 local Hotbar = require(script.Parent.Hotbar)
 local Placement = require(script.Parent.Placement)
 local UnitPanel = require(script.Parent.UnitPanel)
+local Hud = require(script.Parent.Hud)
 
 local remotes = RS:WaitForChild("Remotes")
 local placeEvent = remotes:WaitForChild("PlaceUnit")
@@ -23,6 +24,7 @@ end
 Hotbar.init()
 stateEvent.OnClientEvent:Connect(function(s)
 	Hotbar.setState(s)
+	Hud.setState(s)
 	if s == "lobby" then
 		clear()
 		UnitPanel.close()
@@ -39,17 +41,22 @@ local function select(i)
 	end
 	UnitPanel.close()
 	selected = i
-	Placement.start(Config.UNITS[i])
+	Placement.start(Config.UNITS[i], i)
 	Hotbar.highlight(i)
 end
 Hotbar.onSelect = select
-Hotbar.onStart = function()
-	startEvent:FireServer()
+Hud.onVote = function()
+	startEvent:FireServer() -- toggles my vote
+end
+Hud.onUnitClicked = function(p)
+	clear()
+	UnitPanel.open(p)
 end
 
 local cashValue = Players.LocalPlayer:WaitForChild("leaderstats"):WaitForChild("Cash")
 Placement.init(cashValue)
-UnitPanel.init(cashValue, remotes:WaitForChild("UpgradeUnit"), remotes:WaitForChild("SellUnit"))
+Hud.init(cashValue)
+UnitPanel.init(cashValue, remotes:WaitForChild("UpgradeUnit"), remotes:WaitForChild("SellUnit"), remotes:WaitForChild("SetTargeting"))
 local mouse = Players.LocalPlayer:GetMouse()
 
 -- Find one of MY placed units under the mouse (unit part or its topper).
@@ -89,6 +96,11 @@ UIS.InputBegan:Connect(function(input, processed)
 	elseif input.KeyCode == Enum.KeyCode.Q or input.UserInputType == Enum.UserInputType.MouseButton2 then
 		clear()
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1 and selected then
+		local why = Placement.reason()
+		if why then
+			Placement.flash(why) -- keep placing so the player can move and retry
+			return
+		end
 		local pos = Placement.position()
 		if pos then
 			placeEvent:FireServer(selected, pos)

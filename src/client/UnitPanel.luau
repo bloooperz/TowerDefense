@@ -6,7 +6,7 @@ local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
 local UnitPanel = {}
 local player = Players.LocalPlayer
-local cashValue, upgradeEvent, sellEvent
+local cashValue, upgradeEvent, sellEvent, targetEvent
 local gui = {}
 local current, ring, model, conns = nil, nil, nil, {}
 local angle = 0
@@ -93,6 +93,7 @@ local function refresh()
 		gui.upgrade.Text = "UPGRADE  $" .. up.cost
 		gui.upgrade.BackgroundColor3, gui.upgrade.AutoButtonColor = ok and GREEN or GREY, ok
 	end
+	gui.target.Text = "Target: " .. (current:GetAttribute("Targeting") or "First")
 	local spent = current:GetAttribute("Spent") or u.cost
 	gui.sell.Text = "SELL  $" .. math.floor(spent * Config.SELL_REFUND)
 
@@ -125,13 +126,13 @@ local function buildModel(unitPart)
 	gui.camDist = clone.Size.Magnitude * 1.6
 end
 
-function UnitPanel.init(cash, upEv, sellEv)
-	cashValue, upgradeEvent, sellEvent = cash, upEv, sellEv
+function UnitPanel.init(cash, upEv, sellEv, targetEv)
+	cashValue, upgradeEvent, sellEvent, targetEvent = cash, upEv, sellEv, targetEv
 	local screen = make("ScreenGui", { Name = "UnitPanel", ResetOnSpawn = false }, player:WaitForChild("PlayerGui"))
 	local panel = make("Frame", {
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 20, 0.5, 0),
-		Size = UDim2.fromOffset(280, 440),
+		Size = UDim2.fromOffset(280, 488),
 		BackgroundColor3 = DARK,
 		BackgroundTransparency = 0.05,
 		Visible = false,
@@ -195,6 +196,14 @@ function UnitPanel.init(cash, upEv, sellEv)
 		make("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, b)
 		return b
 	end
+	gui.target = button("Target: First", Color3.fromRGB(60, 110, 200), -148)
+	gui.target.MouseButton1Click:Connect(function()
+		if current then
+			local modes = Config.TARGET_MODES
+			local i = table.find(modes, current:GetAttribute("Targeting") or "First") or 1
+			targetEvent:FireServer(current:GetAttribute("UnitId"), modes[i % #modes + 1])
+		end
+	end)
 	gui.upgrade = button("UPGRADE", GREEN, -100)
 	gui.sell = button("SELL", RED, -52)
 	gui.upgrade.MouseButton1Click:Connect(function()

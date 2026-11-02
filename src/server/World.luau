@@ -65,6 +65,7 @@ function World.build()
 		Color = Color3.fromRGB(0, 120, 255),
 	}, map)
 	World.baseLabel = billboard(World.base, "")
+	World.baseLabel.Parent.Size = UDim2.fromOffset(120, 28)
 
 	World.runtime = Instance.new("Folder")
 	World.runtime.Name = "Runtime"

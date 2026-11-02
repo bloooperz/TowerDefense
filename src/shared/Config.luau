@@ -25,7 +25,7 @@ Config.UNITS = {
 	-- `upgrades`: levels 2..N. Each sets ABSOLUTE stats (omitted = unchanged).
 	-- `ability` inside an upgrade overrides keys of abilityConfig.
 	{
-		name = "Basic", cost = 50, size = 3, range = 18, damage = 20, rate = 0.5,
+		name = "Basic", maxPlaced = 4, cost = 50, size = 3, range = 18, damage = 20, rate = 0.5,
 		upgrades = {
 			{ cost = 60, damage = 28, range = 20 },
 			{ cost = 100, damage = 40, range = 22, rate = 0.45 },
@@ -33,7 +33,7 @@ Config.UNITS = {
 		},
 	},
 	{
-		name = "Sniper", cost = 120, size = 3, range = 45, damage = 80, rate = 2.0,
+		name = "Sniper", maxPlaced = 3, cost = 120, size = 3, range = 45, damage = 80, rate = 2.0,
 		upgrades = {
 			{ cost = 130, damage = 120 },
 			{ cost = 220, damage = 180, range = 55, rate = 1.8 },
@@ -41,7 +41,7 @@ Config.UNITS = {
 		},
 	},
 	{
-		name = "Rapid", cost = 90, size = 2, range = 14, damage = 6, rate = 0.12,
+		name = "Rapid", maxPlaced = 4, cost = 90, size = 2, range = 14, damage = 6, rate = 0.12,
 		upgrades = {
 			{ cost = 100, damage = 8 },
 			{ cost = 170, damage = 11, range = 16, rate = 0.1 },
@@ -56,7 +56,8 @@ Config.UNITS = {
 		range = 22,
 		damage = 15,
 		rate = 0.8,
-		unique = true,
+		unique = true, -- shows a star; the cap below is what limits it
+		maxPlaced = 1,
 		topper = Color3.new(0, 0, 0), -- thin slab on top marks a unique unit
 		ability = "Mogumo",
 		abilityConfig = {
@@ -74,6 +75,9 @@ Config.UNITS = {
 		},
 	},
 }
+
+Config.VOTE_COUNTDOWN = 30 -- seconds after first player enters the map
+Config.TARGET_MODES = { "First", "Last", "Strongest", "Weakest", "Closest" }
 
 Config.SELL_REFUND = 0.5 -- fraction of total spent
 
@@ -112,6 +116,11 @@ function Config.waveInfo(wave: number)
 	}
 end
 Config.WAVE_BREAK = 4
+
+-- Max copies of a unit one player can have placed (default 99).
+function Config.maxPlaced(u)
+	return u.maxPlaced or 99
+end
 
 -- Placement rule, shared so client preview and server check agree.
 function Config.isValidPlacement(pos: Vector3, size: number): boolean

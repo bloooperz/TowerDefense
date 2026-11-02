@@ -15,19 +15,21 @@ To get updates: `git pull` while `rojo serve` is running — Studio syncs automa
 |---|---|
 | `src/shared` | `ReplicatedStorage.Shared` (Config) |
 | `src/server` | `ServerScriptService.Server` (Main, World, Match, Enemies, Towers, Abilities/) |
-| `src/client` | `StarterPlayer.StarterPlayerScripts.Client` (Main, Hotbar, Placement, UnitPanel) |
+| `src/client` | `StarterPlayer.StarterPlayerScripts.Client` (Main, Hud, Hotbar, Placement, UnitPanel, MyUnits, Style) |
 
 ## Controls
 - Walk into the purple circle in the lobby to go to the map.
-- **START** button begins the waves (you can place units before starting).
+- **Vote Start** (toggle) shows `x/y ready`. The match starts when everyone on the map has voted, or when the 30s countdown (starting when the first player arrives) runs out. Place units while you wait.
+- HUD: wave + enemies-left bar and base HP bar at the top, cash above the hotbar, and your units on the right (click one to open its panel).
 - **1 / 2 / 3 / 4** (or click a slot) to pick a unit, move the mouse to aim, **left-click** to place.
-- **Q** or **right-click** cancels.
-- **Click one of your placed units** (when not placing) to open its panel: 3D preview, level, stats with next-level values, **Upgrade** and **Sell** (50% refund of everything spent). **Esc**, the **X**, or clicking elsewhere closes it.
+- **Q** or **right-click** cancels. Red text by the cursor explains why a spot is blocked (`Not enough money!`, `Invalid spot!`, `Limit reached!`).
+- Each unit has a placement cap shown on its hotbar slot (Basic 4, Sniper 3, Rapid 4, Mogumo 1).
+- **Click one of your placed units** (when not placing) to open its panel: 3D preview, level, stats with next-level values, **Targeting** (First / Last / Strongest / Weakest / Closest), **Upgrade** and **Sell** (50% refund of everything spent). **Esc**, the **X**, or clicking elsewhere closes it.
 
 ## Adding a unit
 Add an entry to `Config.UNITS` in `src/shared/Config.luau`:
 ```lua
-{ name = "Splash", cost = 150, size = 3, range = 20, damage = 40, rate = 1.0 },
+{ name = "Splash", maxPlaced = 3, cost = 150, size = 3, range = 20, damage = 40, rate = 1.0 },
 ```
 Optional `upgrades` = list of levels 2..N, each with a `cost` and the ABSOLUTE stats it sets (`damage`, `range`, `rate`; omitted = unchanged), plus `ability = {...}` to override ability settings:
 ```lua
@@ -44,5 +46,8 @@ The hotbar builds itself from that list (keys 1–6 are bound). Waves are tuned 
 - Passive **Divine Dogs**: every 4th attack spawns a black dog on the nearest point of the track. It runs backward toward the enemy spawn (20 studs/s, up to 3s), dealing 40 damage once to each enemy it passes. Max 2 dogs per Mogumo. Upgrades raise dog damage (60/90/140), max dogs (3 at Lv 3, 4 at Lv 4) and at Lv 4 dogs come every 3rd attack.
 
 To add another unique unit:
-1. Add a `Config.UNITS` entry with `unique = true`, optional `topper = Color3`, `ability = "Name"` and an `abilityConfig` table.
+1. Add a `Config.UNITS` entry with `unique = true` (star) and `maxPlaced = 1`, optional `topper = Color3`, `ability = "Name"` and an `abilityConfig` table.
 2. Create `src/server/Abilities/Name.luau` exposing `new(tower, cfg)` returning an object with `onAttack(target)` and `cleanup()` (see `Mogumo.luau`).
+
+## Match info
+The server publishes match state as attributes on `ReplicatedStorage.MatchInfo` (`MatchState`, `Wave`, `WaveTotal`, `EnemiesLeft`, `BaseHP`, `BaseMaxHP`, `Countdown`, `Votes`, `InMatch`). Each player's vote is the `Voted` attribute on their Player. The HUD only reads these.
