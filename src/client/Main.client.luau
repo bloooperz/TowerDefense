@@ -41,7 +41,7 @@ Net.listen("Notify", function(text, kind)
 	end
 	Toast.show(text, kind)
 end)
-for name, mod in pairs({ Hotbar = Hotbar, PathRenderer = PathRenderer, MapSelect = MapSelect, Results = Results, LobbyUI = LobbyUI }) do
+for name, mod in pairs({ Hotbar = Hotbar, PathRenderer = PathRenderer, MapSelect = MapSelect, Results = Results, LobbyUI = LobbyUI, DevMenu = require(script.Parent.Dev.DevMenu) }) do
 	local ok = Log.try("Client", name .. ".init", mod.init)
 	if not ok then
 		Toast.show(name .. " failed to load (see Output)", "error")

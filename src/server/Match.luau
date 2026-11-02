@@ -23,6 +23,8 @@ local Cash = require(Shared.Cash)
 local log = Log.new("Match")
 
 local Match = {}
+-- Studio dev hooks (server/Dev.luau). godMode: leaks don't hurt the base. skipToken bumps abort the current wave.
+Match.dev = { godMode = false, skipToken = 0 }
 local inMatch = {} -- [player] = true
 local votes = {}
 local state = "idle" -- idle | waiting | running | over
@@ -271,10 +273,14 @@ local function runWavesInner()
 		info:SetAttribute("WaveTotal", w.total)
 		sync()
 		Towers.broadcast("onWaveStart", wave)
+		local skipAt = Match.dev.skipToken
 		for _, g in ipairs(w.groups) do
+			if Match.dev.skipToken ~= skipAt then
+				break
+			end
 			local def = Enemies.get(g.enemy)
 			for _ = 1, g.count do
-				if not alive() then
+				if not alive() or Match.dev.skipToken ~= skipAt then
 					break
 				end
 				if def then
@@ -317,6 +323,21 @@ function runWaves()
 	end
 end
 
+-- Dev: abort the current wave (stop spawning, clear enemies); the loop then advances normally.
+function Match.devSkipWave()
+	if state ~= "running" then
+		return "No wave running (" .. state .. ")"
+	end
+	Match.dev.skipToken += 1
+	EnemySim.clear()
+	enemiesLeft = 0
+	sync()
+	return nil
+end
+function Match.isInMatch(plr)
+	return inMatch[plr] == true and (state == "waiting" or state == "running")
+end
+
 local function ownedTower(plr, id)
 	if (state ~= "waiting" and state ~= "running") or not inMatch[plr] then
 		return nil
@@ -331,7 +352,9 @@ end
 function Match.init(infoFolder)
 	info = infoFolder
 	Combat.onLeak(function(e)
-		baseHealth -= e.boss and 5 or 1
+		if not Match.dev.godMode then
+			baseHealth -= e.boss and 5 or 1
+		end
 		enemiesLeft = math.max(enemiesLeft - 1, 0)
 		sync()
 	end)

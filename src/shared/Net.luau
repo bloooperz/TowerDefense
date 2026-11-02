@@ -25,6 +25,11 @@ Net.DEFS = {
 	Results = { dir = "s2c" },
 	Notify = { dir = "s2c" },
 	EnemyDied = { dir = "s2c" }, -- (enemyId) client hides instantly, before Destroy replicates
+	-- Studio-only dev menu (server/Dev.luau). studioOnly remotes are NOT created outside Studio.
+	DevSandbox = { dir = "c2s", args = { "string", "string", "number", "number", "number", "number" }, rate = 4, studioOnly = true },
+	DevToggle = { dir = "c2s", args = { "string", "boolean" }, rate = 6, studioOnly = true },
+	DevSkipWave = { dir = "c2s", args = {}, rate = 2, studioOnly = true },
+	DevReset = { dir = "c2s", args = {}, rate = 2, studioOnly = true },
 	Beam = { dir = "s2c", unreliable = true }, -- (from, to, color) drawn client-side -- (text, kind) toast; kind = "error" | "info"
 }
 
@@ -77,6 +82,9 @@ function Net.initServer()
 	folder = Instance.new("Folder")
 	folder.Name = "Remotes"
 	for name in pairs(Net.DEFS) do
+		if Net.DEFS[name].studioOnly and not RunService:IsStudio() then
+			continue
+		end
 		local r = Instance.new(Net.DEFS[name].unreliable and "UnreliableRemoteEvent" or "RemoteEvent")
 		r.Name, r.Parent = name, folder
 		remotes[name] = r
@@ -105,6 +113,9 @@ local rateWarned = {}
 function Net.on(name, fn)
 	local def = Net.DEFS[name]
 	assert(RunService:IsServer() and def and def.dir == "c2s", "Net.on: bad remote " .. name)
+	if def.studioOnly and not RunService:IsStudio() then
+		return -- remote does not exist in published builds
+	end
 	remote(name).OnServerEvent:Connect(function(plr, ...)
 		if not allow(plr, name, def.rate or 5) then
 			local k = plr.UserId .. name
