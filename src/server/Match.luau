@@ -343,7 +343,8 @@ function Match.init(infoFolder)
 	info:SetAttribute("Countdown", 0)
 	sync()
 
-	Players.PlayerAdded:Connect(function(plr)
+	local function onPlayerAdded(plr)
+		if plr:FindFirstChild("leaderstats") then return end
 		local ls = Instance.new("Folder")
 		ls.Name = "leaderstats"
 		local c = Instance.new("IntValue")
@@ -356,7 +357,12 @@ function Match.init(infoFolder)
 				moveTo(plr, Maps.spawnPoint(map))
 			end
 		end)
-	end)
+	end
+	Players.PlayerAdded:Connect(onPlayerAdded)
+	-- players who joined before this init ran (common in Studio) would otherwise never get leaderstats
+	for _, plr in ipairs(Players:GetPlayers()) do
+		task.spawn(onPlayerAdded, plr)
+	end
 	Players.PlayerRemoving:Connect(function(plr)
 		insidePortal[plr], offeredAt[plr] = nil, nil
 		if inMatch[plr] then
