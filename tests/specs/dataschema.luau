@@ -1,0 +1,31 @@
+local D = require("../../src/shared/DataSchema")
+return function(t)
+	local n = 0
+	local function gen() n += 1; return "u" .. n end
+	local starter = { "Basic", "Sniper" }
+	t.test("default has starter loadout", function()
+		local d = D.default(gen, starter)
+		t.eq(#d.loadout, 2); t.eq(d.version, D.VERSION)
+		t.eq(d.units[d.loadout[1]].unitId, "Basic")
+	end)
+	t.test("nil migrates to default", function()
+		t.eq(D.migrate(nil, gen, starter).version, D.VERSION)
+	end)
+	t.test("v1 migrates coins and owned", function()
+		local d = D.migrate({ version = 1, coins = 42, owned = { "Rapid" } }, gen, starter)
+		t.eq(d.gems, 42); t.eq(d.coins, nil); t.eq(d.owned, nil)
+		t.eq(#d.loadout, 1); t.eq(d.units[d.loadout[1]].unitId, "Rapid")
+		t.eq(d.stats.wins, 0)
+	end)
+	t.test("reconcile fills missing nested stats", function()
+		local d = D.migrate({ version = 2, gems = 5, units = {}, loadout = {}, stats = { wins = 3 } }, gen, starter)
+		t.eq(d.stats.wins, 3); t.eq(d.stats.kills, 0)
+		t.eq(#d.loadout, 2) -- empty units → starter granted
+	end)
+	t.test("dangling loadout uids dropped", function()
+		local d = D.default(gen, starter)
+		table.insert(d.loadout, "ghost")
+		d = D.migrate(d, gen, starter)
+		t.eq(#d.loadout, 2)
+	end)
+end
