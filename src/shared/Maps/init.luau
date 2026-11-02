@@ -27,8 +27,4 @@ function Maps.placementReason(map, pos: Vector3, size: number): string?
 	return PlacementRules.spotReason(map, map and Maps.path(map), Config.MAP_ORIGIN, pos, size)
 end
 
-function Maps.isValidPlacement(map, pos: Vector3, size: number): boolean
-	return Maps.placementReason(map, pos, size) == nil
-end
-
 return Maps

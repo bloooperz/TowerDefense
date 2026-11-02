@@ -16,7 +16,7 @@ pays out something usable, and the collection grows through fun events rather th
    unit choice and passive interplay (control + burst, economy + scaling, etc.). Traits add a
    few percent in a narrow direction and **no trait is universally best** — each trades
    something or only shines in some compositions.
-3. **Event capsules give the cool stuff; rerolls are a fallback; capsules are limited.**
+3. *(Planned, not implemented yet)* **Event capsules give the cool stuff; rerolls are a fallback; capsules are limited.**
    Event-exclusive units and skins come from capsules earned by playing the event. Capsules
    are limited per event so they feel special. Rerolls (for traits / stats) are a safety
    net, never the main chase.
@@ -35,23 +35,22 @@ Summon / Upgrade ◄── Rewards (gems, unit XP, player XP) ◄── Waves (w
 ```
 - **In-match** gold is earned from kills and wave bonuses and spent on placing, upgrading,
   selling units. It resets every match.
-- **Out of match** progression (gems, XP, units, rerolls, capsules) persists via PlayerData.
+- **Out of match** progression (gems, XP, units, XP food items, milestones; rerolls/capsules planned) persists via PlayerData.
 
 ## 4. Progression & economy
 | Currency | Scope | Faucets | Sinks |
 |---|---|---|---|
 | Gold (in-match cash) | match | start cash, kills, wave bonus, farm units | placing, upgrades |
-| Gems | persistent | match rewards, first clears, quests, events | summons, capsules (event), cosmetics |
-| Unit XP | per unit instance | match rewards to equipped units | — (levels raise unit base stats slightly) |
+| Gems | persistent | match rewards, milestones (planned: first clears, quests, events) | planned: summons, capsules (event), cosmetics |
+| Unit XP | per unit instance | match rewards to equipped units | — (levels raise DAMAGE only: mult = 1 + 4.14·t^1.1725, t = (L−1)/79, up to 5.14× at L80) |
 | Player XP | persistent | match rewards | — (unlocks maps/modes, loadout slots) |
 | Rerolls | persistent | events, milestones, duplicate units | trait rerolls |
-| Event capsules | per event, capped | event play, event milestones | opening for event units/skins |
 | Gold (persistent `gold` field) | reserved | — | reserved for upgrades/crafting later |
 
 Rules of thumb:
 - A loss still pays (≈40–60% of a win at the same wave count). Rewards scale with waves cleared.
 - First clear of a Story stage pays a one-time bonus; repeats pay the normal rate.
-- Daily soft caps on gem income from repeated runs beat hard walls — prefer diminishing
+- *(Planned)* Daily soft caps on gem income from repeated runs beat hard walls — prefer diminishing
   returns over zero.
 - Duplicates are never wasted: convert into rerolls or unit XP.
 
@@ -110,9 +109,12 @@ endgame units, it is nerfed or redesigned.
 2. **Infinite**: endless scaling waves; rewards per wave milestone; leaderboard later.
 3. **Challenges**: rotating modifiers (no upgrades, flying-only waves, half gold).
 4. **Raids**: co-op boss encounters with mechanics; raid-exclusive materials.
-5. **Events**: time-limited maps/modes with capped event capsules.
+5. **Events** *(planned)*: time-limited maps/modes with capped event capsules.
 
-## 9. Live-ops / seasonal plan
+## 9. Live-ops / seasonal plan — Planned (not implemented yet)
+None of this exists in code yet: no event capsules, quests, seasons or daily gem caps. These are
+design intent. Planned economy rows: **Event capsules** (per event, capped; faucets: event play,
+event milestones; sink: opening for event units/skins) and **Quests** (gem faucet).
 - 4–6 week seasons. Each season: 1 event map/mode, 1–3 event units via capsules, skins.
 - Capsules earned only via event play and milestones; capped per account per event.
 - Returning event units appear in later reruns — no permanent FOMO.

@@ -97,11 +97,6 @@ function Theme.gloss(_o)
 	return Instance.new("UIGradient")
 end
 
--- Glow is for CARDS only (Shape.glow); elsewhere this is an invisible stand-in so old callers/tweens work.
-function Theme.glow(o, _color, _spread)
-	return Theme.make("Frame", { Name = "Glow", BackgroundTransparency = 1, Size = UDim2.fromScale(0, 0), Visible = false }, o.Parent)
-end
-
 -- World panel surface: dark, nearly opaque, thick colored border.
 function Theme.panel(o, border, palette)
 	palette = palette or Theme.World
