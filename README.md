@@ -1,53 +1,47 @@
 # TowerDefense
 
-A small Roblox tower defense game (lobby + portal, START button, unit hotbar) set up for [Rojo](https://rojo.space/).
+An anime-style Roblox tower defense game built with [Rojo](https://rojo.space/). The content is data-driven: units, enemies, maps and modes each live in their own registry. Player profiles are saved, and every run pays out rewards.
+
+See **[docs/DESIGN.md](docs/DESIGN.md)** for the game design pillars and **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the module map and how to add each content type.
 
 ## Setup
 1. Clone: `git clone https://github.com/bloooperz/TowerDefense.git`
 2. In the folder, run `rojo serve`.
 3. Open a Baseplate place in Studio, open the Rojo plugin, click **Connect**.
-4. Keep the default `SpawnLocation` near (0, 0, 0) (not under the portal at (0, 0, -30)). Press Play.
+4. Keep the default `SpawnLocation` near (0, 0, 0), not under the portal at (0, 0, -30). Press Play.
+5. Optional: to test real saving in Studio, turn on *Game Settings → Security → Enable Studio Access to API Services*. Without it, profiles use an in-memory mock (a warning is printed) and reset when you stop.
 
-To get updates: `git pull` while `rojo serve` is running — Studio syncs automatically.
+To get updates, run `git pull` while `rojo serve` is running. Studio syncs automatically.
 
 ## Layout
-| Folder | Syncs to |
-|---|---|
-| `src/shared` | `ReplicatedStorage.Shared` (Config) |
-| `src/server` | `ServerScriptService.Server` (Main, World, Match, Enemies, Towers, Abilities/) |
-| `src/client` | `StarterPlayer.StarterPlayerScripts.Client` (Main, Hud, Hotbar, Placement, UnitPanel, MyUnits, Style) |
+| Folder | Syncs to | Contents |
+|---|---|---|
+| `src/shared` | `ReplicatedStorage.Shared` | Config, Net, registries (`Units/`, `Enemies/`, `Maps/`, `Modes/`), pure logic (Path, Damage, StatusLogic, Waves, Rewards, UnitStats, DataSchema) |
+| `src/server` | `ServerScriptService.Server` | Main (10 Hz sim tick), World, Match, Enemies, Combat, Towers, AbilityApi, `Abilities/`, `Services/PlayerData` |
+| `src/client` | `StarterPlayer.StarterPlayerScripts.Client` | Main, PathRenderer, Hud, Hotbar, Placement, UnitPanel, MapSelect, Results, MyUnits, Style |
+| `tests` | — | lune unit tests for the pure shared modules |
 
-## Controls
-- Walk into the purple circle in the lobby to go to the map.
-- **Vote Start** (toggle) shows `x/y ready`. The match starts when everyone on the map has voted, or when the 30s countdown (starting when the first player arrives) runs out. Place units while you wait.
-- HUD: wave + enemies-left bar and base HP bar at the top, cash above the hotbar, and your units on the right (click one to open its panel).
-- **1 / 2 / 3 / 4** (or click a slot) to pick a unit, move the mouse to aim, **left-click** to place.
-- **Q** or **right-click** cancels. Red text by the cursor explains why a spot is blocked (`Not enough money!`, `Invalid spot!`, `Limit reached!`).
-- Each unit has a placement cap shown on its hotbar slot (Basic 4, Sniper 3, Rapid 4, Mogumo 1).
-- **Click one of your placed units** (when not placing) to open its panel: 3D preview, level, stats with next-level values, **Targeting** (First / Last / Strongest / Weakest / Closest), **Upgrade** and **Sell** (50% refund of everything spent). **Esc**, the **X**, or clicking elsewhere closes it.
+## Playing
+- Walk into the purple portal. If no match is open, a **map and mode picker** appears. Pick a map (Training Grounds or Zigzag Valley) and a mode (Story: 10 waves, or Infinite), then press **Start**. Other players who walk into the portal join that match.
+- **Vote Start** toggles your ready vote. The match begins when everyone has voted or when the 30 s countdown ends.
+- The hotbar shows your **loadout** (up to 6 units; you start with Basic, Sniper, Rapid and Mogumo). Use **1–6** or click a slot, then **left-click** to place. **Q** or **right-click** cancels.
+- Click a placed unit to open its panel: targeting, upgrade, sell.
+- Enemies: Grunt, Runner, Tank (armored), Flyer (hovers; dogs can't hit it) and Boss (shield and regen, appears every 10th wave and on Story's final wave). Health bars show HP, with the shield in blue.
+- When the match ends, a **Victory/Defeat** screen shows waves cleared, time, kills, damage, and the gems and XP you earned. Losses still pay about half.
 
-## Adding a unit
-Add an entry to `Config.UNITS` in `src/shared/Config.luau`:
-```lua
-{ name = "Splash", maxPlaced = 3, cost = 150, size = 3, range = 20, damage = 40, rate = 1.0 },
+## Adding content (short version — details in ARCHITECTURE.md)
+- **Unit:** add `src/shared/Units/Name.luau` returning `{ name, cost, size, range, damage, rate, maxPlaced, upgrades = {...} }`. For a passive, add `ability = "Name"` and `src/server/Abilities/Name.luau` with `new(tower, cfg, api)` and any hooks: `onPlace`, `onAttack`, `onTick`, `onUpgrade`, `onEnemyKilled`, `onWaveStart`, `cleanup`.
+- **Enemy:** `src/shared/Enemies/Name.luau` with `{ hp, speed, size, reward, color, armor?, shield?, regen?, flying?, boss? }`.
+- **Map:** `src/shared/Maps/Name.luau` with `waypoints`, `trackWidth`, `bounds`, `groundSize` and `spawnOffset`. It appears in the picker automatically.
+- **Mode:** `src/shared/Modes/Name.luau` with `{ name, maxWaves?, hpScale, rewardScale }`.
+- **Remote:** add an entry to `Net.DEFS` with argument types and a rate limit.
+- **Saved field:** bump `DataSchema.VERSION`, add a migration and update `default`. Add a test.
+
+## Tests
 ```
-Optional `upgrades` = list of levels 2..N, each with a `cost` and the ABSOLUTE stats it sets (`damage`, `range`, `rate`; omitted = unchanged), plus `ability = {...}` to override ability settings:
-```lua
-upgrades = {
-	{ cost = 60, damage = 28 },
-	{ cost = 100, damage = 40, range = 22, rate = 0.45 },
-},
+lune run tests/run
 ```
-The hotbar builds itself from that list (keys 1–6 are bound). Waves are tuned in `Config.waveInfo`.
+These cover path math, the damage formula, status stacking, the wave generator, rewards, unit stats and data migrations.
 
-## Unique units
-**Mogumo** (slot 4, $150, unique: 1 per player) — white cube with a black slab on top.
-- Attack: 15 damage, range 22, every 0.8s.
-- Passive **Divine Dogs**: every 4th attack spawns a black dog on the nearest point of the track. It runs backward toward the enemy spawn (20 studs/s, up to 3s), dealing 40 damage once to each enemy it passes. Max 2 dogs per Mogumo. Upgrades raise dog damage (60/90/140), max dogs (3 at Lv 3, 4 at Lv 4) and at Lv 4 dogs come every 3rd attack.
-
-To add another unique unit:
-1. Add a `Config.UNITS` entry with `unique = true` (star) and `maxPlaced = 1`, optional `topper = Color3`, `ability = "Name"` and an `abilityConfig` table.
-2. Create `src/server/Abilities/Name.luau` exposing `new(tower, cfg)` returning an object with `onAttack(target)` and `cleanup()` (see `Mogumo.luau`).
-
-## Match info
-The server publishes match state as attributes on `ReplicatedStorage.MatchInfo` (`MatchState`, `Wave`, `WaveTotal`, `EnemiesLeft`, `BaseHP`, `BaseMaxHP`, `Countdown`, `Votes`, `InMatch`). Each player's vote is the `Voted` attribute on their Player. The HUD only reads these.
+## Mogumo (unique)
+$150, 1 per player. Passive **Divine Dogs**: every 4th attack, a dog spawns on the track nearest Mogumo and runs backward toward the spawn. It bites each ground enemy it meets (40 damage plus a 0.4 s stun; bosses take half the stun). Upgrades raise dog damage and the dog cap, and at Lv 4 a dog comes every 3rd attack.

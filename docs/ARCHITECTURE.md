@@ -32,7 +32,7 @@ server/
 client/
   Main.client       wires everything
   Net (shared)      client side of remotes
-  EnemyRenderer     moves enemy parts locally from replicated (Dist, CheckTime, Speed)
+  PathRenderer     moves enemy parts locally from replicated (Dist, CheckTime, Speed)
   Hotbar            loadout-driven hotbar with caps
   Placement         ghost, ring, cursor reasons
   UnitPanel         upgrade / sell / targeting
@@ -52,7 +52,7 @@ tests/              lune specs for PURE modules (`lune run tests/run`)
     BaseHP, BaseMaxHP, Countdown, Votes, InMatch, MaxWaves.
   - Player: `Voted`, `Loadout` (comma-separated unit ids), `Gems`, `Level`.
   - Unit parts: UnitId, UnitType, OwnerId, Level, Spent, Targeting.
-  - Enemy parts: Dist, CheckTime, Speed, MapId, Height. Client `EnemyRenderer` computes
+  - Enemy parts: Dist, CheckTime, Speed, Height (map from MatchInfo.MapId). Client `PathRenderer` computes
     the position each frame with `Path.positionAt`; the server uses the **same** math.
 - **Movement** is time-based: `dist = Dist + (serverNow − CheckTime) × Speed`. When speed
   changes (status), the server "checkpoints" (writes new Dist/CheckTime/Speed). No physics.
