@@ -6,7 +6,7 @@ local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 local Placement = {}
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
-local ghost, ring, unit
+local ghost, ring, unit, topper
 local cashValue
 
 function Placement.init(cash)
@@ -18,6 +18,9 @@ function Placement.init(cash)
 		local p = mouse.Hit.Position
 		local pos = Vector3.new(math.round(p.X), Config.MAP_ORIGIN.Y + 0.5 + unit.size / 2, math.round(p.Z))
 		ghost.Position = pos
+		if topper then
+			topper.Position = pos + Vector3.new(0, unit.size / 2 + 0.2, 0)
+		end
 		ring.CFrame = CFrame.new(pos.X, Config.MAP_ORIGIN.Y + 0.6, pos.Z) * CFrame.Angles(0, 0, math.rad(90))
 		local ok = Config.isValidPlacement(pos, unit.size) and cashValue.Value >= unit.cost
 		ring.Color = ok and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
@@ -33,6 +36,10 @@ function Placement.clear()
 		ring:Destroy()
 		ring = nil
 	end
+	if topper then
+		topper:Destroy()
+		topper = nil
+	end
 	unit = nil
 end
 
@@ -47,6 +54,12 @@ function Placement.start(u)
 	ring.Shape, ring.Anchored, ring.CanCollide, ring.CanQuery = Enum.PartType.Cylinder, true, false, false
 	ring.Size, ring.Transparency, ring.Material = Vector3.new(0.2, u.range * 2, u.range * 2), 0.7, Enum.Material.Neon
 	ring.Parent = workspace
+	if u.topper then
+		topper = Instance.new("Part")
+		topper.Anchored, topper.CanCollide, topper.CanQuery = true, false, false
+		topper.Size, topper.Transparency, topper.Color = Vector3.new(u.size, 0.4, u.size), 0.5, u.topper
+		topper.Parent = ghost
+	end
 	mouse.TargetFilter = ghost
 end
 

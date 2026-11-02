@@ -38,7 +38,9 @@ local function shoot(from, to)
 	end)
 end
 
-function Towers.place(unitIndex, pos)
+local abilityFolder = script.Parent:WaitForChild("Abilities")
+
+function Towers.place(unitIndex, pos, owner)
 	local u = Config.UNITS[unitIndex]
 	local p = World.part({
 		Name = u.name,
@@ -46,7 +48,19 @@ function Towers.place(unitIndex, pos)
 		Position = pos,
 		Color = Color3.new(1, 1, 1),
 	}, World.runtime)
-	local t = { part = p, unit = u, alive = true }
+	if u.topper then
+		World.part({
+			Name = "Topper",
+			Size = Vector3.new(u.size, 0.4, u.size),
+			Position = pos + Vector3.new(0, u.size / 2 + 0.2, 0),
+			Color = u.topper,
+			CanCollide = false,
+		}, p)
+	end
+	local t = { part = p, unit = u, alive = true, owner = owner, index = unitIndex, attacks = 0 }
+	if u.ability then
+		t.ability = require(abilityFolder:WaitForChild(u.ability)).new(t, u.abilityConfig or {})
+	end
 	table.insert(Towers.placed, t)
 	task.spawn(function()
 		while t.alive do
@@ -54,6 +68,10 @@ function Towers.place(unitIndex, pos)
 			if target then
 				shoot(p.Position, Enemies.position(target))
 				Enemies.damage(target, u.damage)
+				t.attacks += 1
+				if t.ability and t.ability.onAttack then
+					t.ability:onAttack(target)
+				end
 				task.wait(u.rate)
 			else
 				task.wait(0.1)
@@ -74,9 +92,22 @@ function Towers.overlaps(pos, size)
 	return false
 end
 
+function Towers.countFor(owner, unitIndex)
+	local n = 0
+	for _, t in ipairs(Towers.placed) do
+		if t.owner == owner and t.index == unitIndex then
+			n += 1
+		end
+	end
+	return n
+end
+
 function Towers.clear()
 	for _, t in ipairs(Towers.placed) do
 		t.alive = false
+		if t.ability and t.ability.cleanup then
+			t.ability:cleanup()
+		end
 		t.part:Destroy()
 	end
 	table.clear(Towers.placed)

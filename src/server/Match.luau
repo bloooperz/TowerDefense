@@ -174,8 +174,11 @@ function Match.init(r)
 		if not Config.isValidPlacement(pos, u.size) or Towers.overlaps(pos, u.size) then
 			return
 		end
+		if u.unique and Towers.countFor(plr, index) >= 1 then
+			return
+		end
 		cash.Value -= u.cost
-		Towers.place(index, pos)
+		Towers.place(index, pos, plr)
 	end)
 end
 
