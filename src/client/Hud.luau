@@ -45,7 +45,7 @@ local function refresh()
 
 	local voted = player:GetAttribute("Voted")
 	ui.vote.Visible = (ms == "waiting")
-	ui.vote.Text = (voted and "✔ Ready  " or "Vote Start  ")
+	ui.vote.Text = (voted and "Ready  " or "Vote Start  ")
 		.. (info:GetAttribute("Votes") or 0) .. "/" .. (info:GetAttribute("InMatch") or 0)
 	ui.vote.BackgroundColor3 = voted and Style.GREY or Style.GREEN
 end
@@ -70,7 +70,7 @@ local function refreshUnits()
 				TextColor3 = Color3.new(1, 1, 1),
 				Text = u.name .. "  Lv " .. (p:GetAttribute("Level") or 1),
 			}, ui.unitList)
-			Style.make("UICorner", { CornerRadius = UDim.new(0, 6) }, b)
+			Style.shape(b, 5)
 			b.MouseButton1Click:Connect(function()
 				if Hud.onUnitClicked then
 					Hud.onUnitClicked(p)
@@ -82,7 +82,7 @@ end
 
 function Hud.init(cashValue)
 	info = RS:WaitForChild("MatchInfo")
-	local screen = Style.make("ScreenGui", { Name = "Hud", ResetOnSpawn = false }, player:WaitForChild("PlayerGui"))
+	local screen = Style.make("ScreenGui", { Name = "Hud", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling }, player:WaitForChild("PlayerGui"))
 
 	-- TOP CENTER
 	ui.top = Style.panel({
@@ -107,8 +107,7 @@ function Hud.init(cashValue)
 		TextColor3 = Color3.new(1, 1, 1),
 		Visible = false,
 	}, ui.top)
-	Style.make("UICorner", { CornerRadius = UDim.new(0, 12) }, ui.vote)
-	Style.make("UIStroke", { Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, ui.vote)
+	Style.shape(ui.vote, 10)
 	Style.make("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, ui.vote)
 	ui.vote.MouseButton1Click:Connect(function()
 		if Hud.onVote then

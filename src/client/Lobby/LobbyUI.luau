@@ -23,22 +23,22 @@ local player = Players.LocalPlayer
 local LobbyUI = {}
 
 local LEFT = {
-	{ name = "Inventory", icon = "🎒", key = "I" },
-	{ name = "Units", icon = "🧊", key = "K" },
-	{ name = "Trade", icon = "🤝", key = "T" },
-	{ name = "Summon", icon = "✨", key = "F", isNew = true },
-	{ name = "Play", icon = "▶", key = "P" },
+	{ name = "Inventory", key = "I" },
+	{ name = "Units", key = "K" },
+	{ name = "Trade", key = "T" },
+	{ name = "Summon", key = "F", isNew = true },
+	{ name = "Play", key = "P" },
 }
 local RIGHT = {
-	{ name = "Quests", icon = "📜", key = "J" },
-	{ name = "Battlepass", icon = "🎖", key = "B" },
-	{ name = "Profile", icon = "👤", key = "U" },
-	{ name = "Friends", icon = "👥", key = "G" },
+	{ name = "Quests", key = "J" },
+	{ name = "Battlepass", key = "B" },
+	{ name = "Profile", key = "U" },
+	{ name = "Friends", key = "G" },
 }
 local CURRENCIES = { -- placeholder until Gold/Rerolls exist in DataSchema
-	{ attr = "Gems", icon = "💎", color = Color3.fromRGB(90, 200, 255) },
-	{ attr = "Gold", icon = "🪙", color = Color3.fromRGB(255, 210, 60) },
-	{ attr = "Rerolls", icon = "🎲", color = Color3.fromRGB(200, 120, 255) },
+	{ attr = "Gems", color = Color3.fromRGB(90, 200, 255) },
+	{ attr = "Gold", color = Color3.fromRGB(255, 210, 60) },
+	{ attr = "Rerolls", color = Color3.fromRGB(200, 120, 255) },
 }
 
 local screen, panels, hotbar, levelFill, levelText = nil, {}, nil, nil, nil
@@ -100,7 +100,7 @@ local function sidePanel(list, anchorX, posX)
 	for i, def in ipairs(list) do
 		local keyName = Input.keyFor(def.name) or def.key
 		local h = Button.new({
-			name = def.name, icon = def.icon, key = keyName, isNew = def.isNew,
+			name = def.name, key = keyName, isNew = def.isNew,
 			color = Theme.COLORS[def.name],
 			onClick = actions[def.name],
 		}, f)
@@ -123,7 +123,7 @@ local function eventBanner()
 	Theme.stroke(card, 3)
 	Theme.gloss(card)
 	local glow = Theme.glow(card, Theme.COLORS.Event, 6)
-	Theme.label({ Text = "🔥 Shadow Festival", Size = UDim2.new(1, -16, 0, 30), Position = UDim2.fromOffset(8, 4), ZIndex = 3 }, card)
+	Theme.label({ Text = "Shadow Festival", Size = UDim2.new(1, -16, 0, 30), Position = UDim2.fromOffset(8, 4), ZIndex = 3 }, card)
 	Theme.label({ Text = "Ends in 3d 12h (placeholder)", Size = UDim2.new(1, -16, 0, 18), Position = UDim2.fromOffset(8, 38), ZIndex = 3, TextColor3 = Color3.fromRGB(255, 240, 210) }, card)
 	-- pulse glow
 	TweenService:Create(glow, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { BackgroundTransparency = 0.25 }):Play()
@@ -140,7 +140,8 @@ local function currencies(parent)
 		Theme.round(pill, 18)
 		Theme.stroke(pill, 3)
 		Theme.make("UIStroke", { Thickness = 1.5, Color = c.color, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Transparency = 0.2 }, pill)
-		Theme.label({ Text = c.icon, Size = UDim2.fromOffset(28, 28), Position = UDim2.fromOffset(6, 4), TextStrokeTransparency = 1 }, pill)
+		local slot = Theme.shape.iconSlot({ Size = UDim2.fromOffset(26, 26), Position = UDim2.fromOffset(7, 5) }, pill)
+		Theme.shape.tooltip(slot, c.attr, c.color)
 		local n = Theme.label({ Size = UDim2.new(1, -44, 0, 26), Position = UDim2.fromOffset(38, 5), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = c.color }, pill)
 		local function upd()
 			n.Text = tostring(player:GetAttribute(c.attr) or 0)

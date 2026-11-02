@@ -24,7 +24,7 @@ return function(t)
 	t.test("reconcile fills missing nested stats", function()
 		local d = D.migrate({ version = 2, gems = 5, units = {}, loadout = {}, stats = { wins = 3 } }, gen, starter)
 		t.eq(d.stats.wins, 3); t.eq(d.stats.kills, 0)
-		t.eq(#d.loadout, 2) -- empty units → starter granted
+		t.eq(#d.loadout, 2) -- empty units -> starter granted
 	end)
 	t.test("dangling loadout uids dropped", function()
 		local d = D.default(gen, starter)

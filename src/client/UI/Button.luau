@@ -25,7 +25,8 @@ function Button.new(opts, parent)
 	Theme.gloss(b)
 	local scale = Theme.make("UIScale", { Scale = 1 }, b)
 	Theme.glow(b, opts.color, 4).Name = "Glow"
-	Theme.label({ Text = opts.icon or "?", Size = UDim2.fromScale(0.6, 0.5), Position = UDim2.fromScale(0.2, 0.08), ZIndex = 3, TextStrokeTransparency = 1 }, b)
+	-- blank icon slot (real art drops in later); label underneath names the button
+	Theme.shape.iconSlot({ Name = "Icon", Size = UDim2.fromScale(0.5, 0.46), Position = UDim2.fromScale(0.25, 0.12), ZIndex = 3 }, b)
 	Theme.label({ Text = opts.name, Size = UDim2.new(1, -6, 0.26, 0), Position = UDim2.new(0, 3, 0.68, 0), ZIndex = 3 }, b)
 	if opts.key then
 		local k = Theme.label({ Text = opts.key, Size = UDim2.fromOffset(20, 20), Position = UDim2.fromOffset(4, 3), ZIndex = 4, BackgroundTransparency = 0.3, BackgroundColor3 = Theme.OUTLINE }, b)

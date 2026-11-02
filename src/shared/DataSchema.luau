@@ -80,7 +80,7 @@ local function reconcile(d, defaults)
 	end
 end
 
--- Returns migrated data (mutates input). `nil` → fresh default.
+-- Returns migrated data (mutates input). `nil` -> fresh default.
 function DataSchema.migrate(d, genUid, starter: { string }, maxLoadout: number?)
 	if d == nil then
 		return DataSchema.default(genUid, starter)

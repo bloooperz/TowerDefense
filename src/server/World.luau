@@ -37,7 +37,7 @@ local function billboard(adornee, text, studs, height)
 	g.Parent = anchor
 	local l = Instance.new("TextLabel")
 	l.Size, l.BackgroundTransparency, l.TextScaled = UDim2.fromScale(1, 1), 1, true
-	l.TextColor3, l.Text, l.Font = Color3.new(1, 1, 1), text, Enum.Font.FredokaOne
+	l.TextColor3, l.Text, l.Font = Color3.new(1, 1, 1), text, Enum.Font.GothamBlack
 	l.TextStrokeTransparency = 0.4
 	l.Parent = g
 	return l

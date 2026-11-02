@@ -1,6 +1,7 @@
 -- Unit card: portrait (ViewportFrame cube model), rarity border, Lv, cost, name,
--- damage-type icon badge (⚔️/🔮) and optional element icon badge, in a non-overlapping row.
+-- damage-type badge and optional element badge (blank icon slots, name on hover), in a non-overlapping row.
 local Theme = require(script.Parent.Theme)
+local Shape = require(script.Parent.Shape)
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
 local Card = {}
@@ -26,20 +27,13 @@ function Card.portrait(u, parent)
 end
 
 local BADGE = 18
--- Round icon badge with a colored rim; full word appears on hover.
-local function badge(icon, word, rim, parent, order)
-	local b = Theme.make("Frame", { Size = UDim2.fromOffset(BADGE, BADGE), BackgroundColor3 = Theme.OUTLINE, LayoutOrder = order, ZIndex = 5 }, parent)
-	Theme.make("UICorner", { CornerRadius = UDim.new(1, 0) }, b)
-	Theme.make("UIStroke", { Thickness = 2, Color = rim, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, b)
-	Theme.label({ Text = icon, Size = UDim2.fromScale(0.8, 0.8), Position = UDim2.fromScale(0.1, 0.1), TextStrokeTransparency = 1, ZIndex = 6 }, b)
-	local tip = Theme.label({ Text = word, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, 0, 0, -3), Size = UDim2.fromOffset(64, 14), BackgroundTransparency = 0.1, BackgroundColor3 = Theme.OUTLINE, Visible = false, ZIndex = 8 }, b)
-	Theme.round(tip, 4)
-	b.MouseEnter:Connect(function()
-		tip.Visible = true
-	end)
-	b.MouseLeave:Connect(function()
-		tip.Visible = false
-	end)
+-- Chamfered badge with a colored edge and a blank icon slot (art drops in later); word appears on hover.
+local function badge(word, rim, parent, order)
+	local b = Theme.make("Frame", { Name = word .. "Badge", Size = UDim2.fromOffset(BADGE, BADGE), BackgroundColor3 = Theme.OUTLINE, LayoutOrder = order, ZIndex = 5 }, parent)
+	Shape.apply(b, { cut = 4, edge = rim, thickness = 1.5, highlight = false })
+	Shape.iconSlot({ Size = UDim2.new(1, -6, 1, -6), Position = UDim2.fromOffset(3, 3), ZIndex = 6 }, b)
+	local tip = Shape.tooltip(b, word, rim)
+	tip.AnchorPoint, tip.Position = Vector2.new(1, 1), UDim2.new(1, 0, 0, -3)
 	return b
 end
 
@@ -48,7 +42,9 @@ function Card.new(u, level, parent)
 	local rarity = u and Config.RARITY_COLORS[u.rarity or "Common"] or Color3.fromRGB(80, 80, 90)
 	local c = Theme.make("Frame", { Size = UDim2.fromOffset(86, 104), BackgroundColor3 = Theme.PANEL, ZIndex = 2 }, parent)
 	Theme.round(c, 12)
-	Theme.make("UIStroke", { Thickness = 3, Color = rarity, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, c)
+	Shape.get(c).setEdge(rarity, 2) -- rarity as a sharp edge accent
+	local notch = Shape.accent(c, rarity)
+	notch.AnchorPoint, notch.Position, notch.Size, notch.Rotation = Vector2.new(0, 0), UDim2.fromOffset(12, -1), UDim2.new(0.4, 0, 0, 3), 0
 	if not u then
 		Theme.label({ Text = "+", Size = UDim2.fromScale(0.5, 0.5), Position = UDim2.fromScale(0.25, 0.25), TextTransparency = 0.5, ZIndex = 3 }, c)
 		return c
@@ -63,9 +59,9 @@ function Card.new(u, level, parent)
 	local row = Theme.make("Frame", { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -7, 0, 63), Size = UDim2.new(1, -14, 0, BADGE), BackgroundTransparency = 1, ZIndex = 5 }, c)
 	Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, row)
 	local dt = u.damageType or "Physical"
-	badge(Config.DAMAGE_TYPE_ICONS[dt] or "?", dt, Config.DAMAGE_TYPE_COLORS[dt] or Color3.new(0.5, 0.5, 0.5), row, 1)
+	badge(dt, Config.DAMAGE_TYPE_COLORS[dt] or Color3.new(0.5, 0.5, 0.5), row, 1)
 	if u.element then
-		badge(Config.ELEMENT_ICONS[u.element] or "?", u.element, Config.ELEMENT_COLORS[u.element] or Color3.new(1, 1, 1), row, 2)
+		badge(u.element, Config.ELEMENT_COLORS[u.element] or Color3.new(1, 1, 1), row, 2)
 	end
 	Theme.label({ Text = u.name, Size = UDim2.new(1, -8, 0, 20), Position = UDim2.new(0, 4, 1, -34), ZIndex = 4 }, c)
 	Theme.label({ Text = u.rarity or "Common", Size = UDim2.new(1, -8, 0, 12), Position = UDim2.new(0, 4, 1, -14), TextColor3 = rarity, ZIndex = 4 }, c)

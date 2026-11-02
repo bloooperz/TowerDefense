@@ -8,7 +8,6 @@ return {
 	ability = "Mogumo",
 	passive = {
 		name = "Divine Dogs",
-		icon = "🐕",
 		describe = "Every {every:ord} attack, Mogumo summons a Divine Dog that charges back along the path, dealing {dogDamage} damage and stunning enemies it hits for {dogStun}s. Up to {maxDogs} dogs at once.",
 	},
 	abilityConfig = {

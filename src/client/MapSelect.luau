@@ -34,7 +34,7 @@ local function button(text, parent, order)
 		Text = text,
 		LayoutOrder = order,
 	}, parent)
-	Style.make("UICorner", { CornerRadius = UDim.new(0, 8) }, b)
+	Style.shape(b, 8)
 	return b
 end
 
@@ -59,7 +59,7 @@ function MapSelect.init()
 			root.Visible = false
 		end,
 	})
-	local screen = Style.make("ScreenGui", { Name = "MapSelect", ResetOnSpawn = false, DisplayOrder = 20 }, Players.LocalPlayer:WaitForChild("PlayerGui"))
+	local screen = Style.make("ScreenGui", { Name = "MapSelect", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 20 }, Players.LocalPlayer:WaitForChild("PlayerGui"))
 	root = Style.panel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(520, 360), Visible = false }, screen)
 	titleLabel = Style.text({ Text = "Choose a map", Size = UDim2.new(1, 0, 0, 36), Position = UDim2.fromOffset(0, 8) }, root)
 	local maps, modes = column("Map", 0, root), column("Mode", 0.5, root)

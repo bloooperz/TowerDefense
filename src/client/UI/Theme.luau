@@ -1,8 +1,13 @@
 -- Lobby visual language: saturated rounded squares, thick dark outline, neon glow, outlined bold text.
 local Theme = {}
-Theme.FONT = Enum.Font.FredokaOne
-Theme.OUTLINE = Color3.fromRGB(15, 12, 25)
-Theme.PANEL = Color3.fromRGB(30, 26, 48)
+local Shape = require(script.Parent.Shape)
+Theme.FONT = Enum.Font.GothamBlack -- display / headers / buttons
+Theme.BODY = Enum.Font.GothamMedium -- readable body text
+Theme.OUTLINE = Color3.fromRGB(8, 6, 16)
+Theme.PANEL = Color3.fromRGB(16, 14, 30) -- deep base; Shape adds the vertical gradient
+Theme.PANEL_2 = Color3.fromRGB(26, 22, 46) -- raised rows/cards
+Theme.EDGE = Color3.fromRGB(130, 110, 255) -- house neon edge
+Theme.shape = Shape
 Theme.COLORS = {
 	Inventory = Color3.fromRGB(255, 150, 40),
 	Units = Color3.fromRGB(60, 200, 90),
@@ -25,44 +30,44 @@ function Theme.make(class, props, parent)
 	return o
 end
 
+-- All surfaces go through UI/Shape (chamfered corners, crisp neon edge, subtle gradient). No corner instances anywhere.
+-- `r` (old corner radius) maps to the cut size so call sites keep their relative sizing.
 function Theme.round(o, r)
-	return Theme.make("UICorner", { CornerRadius = UDim.new(0, r or 12) }, o)
+	return Shape.apply(o, { cut = math.clamp(math.floor((r or 12) * 0.75), 4, 14) })
 end
 
--- Thick dark outline (Border mode so it hugs the shape).
+-- Crisp 1-2px edge. Default edge = the element's own color, brightened (intentional, not a dark blob).
 function Theme.stroke(o, thickness, color)
-	return Theme.make("UIStroke", {
-		Thickness = thickness or 3,
-		Color = color or Theme.OUTLINE,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		LineJoinMode = Enum.LineJoinMode.Round,
-	}, o)
+	local h = Shape.get(o) or Theme.round(o, 12)
+	local fill = h.fill and h.fill() or o.BackgroundColor3
+	h.setEdge(color or Theme.edgeFor(fill), (thickness or 2) >= 4 and 2 or 1.5)
+	return h
 end
 
--- Vertical shine so flat colors read as glossy.
-function Theme.gloss(o)
-	return Theme.make("UIGradient", {
-		Rotation = 90,
-		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(170, 170, 170)),
-	}, o)
+function Theme.edgeFor(fill)
+	local hh, ss, vv = fill:ToHSV()
+	if ss < 0.25 then -- neutral/dark panels get the house neon edge
+		return Theme.EDGE
+	end
+	return Color3.fromHSV(hh, math.min(ss * 0.8, 1), math.min(vv * 1.35 + 0.15, 1))
 end
 
--- Neon glow: a slightly larger, translucent rounded frame behind `o` (same parent).
-function Theme.glow(o, color, spread)
-	spread = spread or 8
-	local g = Theme.make("Frame", {
-		Name = "Glow",
-		AnchorPoint = o.AnchorPoint,
-		Position = o.Position,
-		Size = o.Size + UDim2.fromOffset(spread * 2, spread * 2),
-		BackgroundColor3 = color,
-		BackgroundTransparency = 0.6,
-		ZIndex = math.max(o.ZIndex - 1, 0),
-	}, o.Parent)
-	-- offset for non-centered anchors
-	g.Position = o.Position - UDim2.fromOffset(spread * (1 - 2 * o.AnchorPoint.X), spread * (1 - 2 * o.AnchorPoint.Y))
-	Theme.round(g, 18)
-	return g
+-- Gradient now lives inside Shape (per-piece); kept for call-site compatibility.
+function Theme.gloss(_o)
+	return Instance.new("UIGradient")
+end
+
+-- Soft glow blobs removed in favor of crisp edges; returns an invisible stand-in so tweens/callers still work.
+function Theme.glow(o, _color, _spread)
+	return Theme.make("Frame", { Name = "Glow", BackgroundTransparency = 1, Size = UDim2.fromScale(0, 0), Visible = false }, o.Parent)
+end
+
+-- Header: display font + slanted accent notch on the left.
+function Theme.header(props, parent, accent)
+	props.Font = props.Font or Theme.FONT
+	local l = Theme.label(props, parent)
+	Shape.accent(l, accent or Theme.EDGE)
+	return l
 end
 
 -- Bold outlined label.
@@ -71,7 +76,7 @@ function Theme.label(props, parent)
 		BackgroundTransparency = 1,
 		Font = Theme.FONT,
 		TextColor3 = Color3.new(1, 1, 1),
-		TextStrokeTransparency = 0,
+		TextStrokeTransparency = 0.45,
 		TextStrokeColor3 = Theme.OUTLINE,
 		TextScaled = true,
 	}

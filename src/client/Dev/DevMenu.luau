@@ -89,13 +89,13 @@ local function build()
 		Toast.show("Dev menu: server backend missing", "error")
 		return
 	end
-	local gui = Theme.make("ScreenGui", { Name = "DevMenu", ResetOnSpawn = false, DisplayOrder = 50 }, Players.LocalPlayer:WaitForChild("PlayerGui"))
+	local gui = Theme.make("ScreenGui", { Name = "DevMenu", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 50 }, Players.LocalPlayer:WaitForChild("PlayerGui"))
 	local corner = btn("DEV", Color3.fromRGB(200, 40, 60), gui)
 	corner.AnchorPoint, corner.Position, corner.Size = Vector2.new(1, 1), UDim2.new(1, -8, 1, -8), UDim2.fromOffset(52, 28)
 
 	local frame = Theme.make("Frame", { Size = UDim2.fromOffset(300, 470), Position = UDim2.new(1, -320, 0, 80), BackgroundColor3 = BG, Visible = false }, gui)
 	Theme.round(frame, 10)
-	Theme.make("UIStroke", { Color = Color3.fromRGB(200, 40, 60), Thickness = 2 }, frame)
+	Theme.stroke(frame, 2, Color3.fromRGB(255, 60, 90))
 	local title = Theme.make("TextLabel", { Text = "  DEV MENU (Studio)  [F2]", Font = Enum.Font.GothamBlack, TextSize = 15, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = Color3.fromRGB(200, 40, 60), Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, Active = true }, frame)
 	Theme.round(title, 10)
 	draggable(title, frame)

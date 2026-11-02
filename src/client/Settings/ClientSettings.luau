@@ -147,7 +147,7 @@ local function damageNumber(pos, amount, crit)
 	t.BackgroundTransparency = 1
 	t.Text = tostring(amount) .. (crit and "!" or "")
 	t.TextScaled = true
-	t.Font = Enum.Font.FredokaOne
+	t.Font = Enum.Font.GothamBlack
 	t.TextColor3 = crit and Color3.fromRGB(255, 210, 60) or Color3.new(1, 1, 1)
 	t.TextStrokeTransparency = 0
 	t.Parent = g

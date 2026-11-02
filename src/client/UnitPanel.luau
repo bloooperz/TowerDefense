@@ -11,6 +11,7 @@ local Passive = require(Shared.Passive)
 local Log = require(Shared.Log)
 local TweenService = game:GetService("TweenService")
 local Theme = require(script.Parent.UI.Theme)
+local Shape = require(script.Parent.UI.Shape)
 local Toast = require(script.Parent.Toast)
 local log = Log.new("UnitPanel")
 local warned = {} -- [unitName] = true: passive problems are logged/toasted once per unit
@@ -41,7 +42,7 @@ local function make(class, props, parent)
 	return o
 end
 local function round(o, r)
-	make("UICorner", { CornerRadius = UDim.new(0, r or 10) }, o)
+	return Shape.apply(o, { cut = math.clamp(math.floor((r or 10) * 0.75), 4, 12) })
 end
 local function text(props, parent)
 	local l = make("TextLabel", {
@@ -68,14 +69,14 @@ local function statLine(label, now, nxt, suffix)
 	suffix = suffix or ""
 	local s = label .. ": " .. fmt(now) .. suffix
 	if nxt and nxt ~= now then
-		s ..= "  →  " .. fmt(nxt) .. suffix
+		s ..= "  >  " .. fmt(nxt) .. suffix
 	end
 	return s
 end
 
 local function setSide(open)
 	sideOpen = open
-	gui.passiveBtn.Text = (gui.passiveIcon or "✦") .. "  " .. (gui.passiveName or "Passive") .. (open and "  ◀" or "  ▶")
+	gui.passiveBtn.Text = (gui.passiveName or "Passive") .. (open and "  <" or "  >")
 	TweenService:Create(gui.side, SLIDE, { Position = open and UDim2.fromScale(0, 0) or UDim2.fromScale(-1.05, 0) }):Play()
 end
 
@@ -88,8 +89,8 @@ refreshPassive = function(u, st, nx)
 		return
 	end
 	gui.passiveBtn.Visible = true
-	gui.passiveName, gui.passiveIcon = u.passive.name or "Passive", u.passive.icon
-	gui.sideTitle.Text = (u.passive.icon and (u.passive.icon .. " ") or "") .. gui.passiveName
+	gui.passiveName = u.passive.name or "Passive"
+	gui.sideTitle.Text = gui.passiveName
 	local plain, rich, problems = Passive.describe(u, st, nx)
 	if #problems > 0 and not warned[u.name] then
 		warned[u.name] = true
@@ -100,7 +101,7 @@ refreshPassive = function(u, st, nx)
 	end
 	gui.sideText.Text = rich or plain or "No description available."
 	gui.sideHint.Text = nx and "Green = changes on next upgrade" or "Max level"
-	gui.passiveBtn.Text = (gui.passiveIcon or "✦") .. "  " .. gui.passiveName .. (sideOpen and "  ◀" or "  ▶")
+	gui.passiveBtn.Text = gui.passiveName .. (sideOpen and "  <" or "  >")
 end
 
 local function refresh()
@@ -123,7 +124,7 @@ local function refresh()
 	local st = Traits.resolve(UnitStats.at(u, level), ov)
 	local nx = level < maxL and Traits.resolve(UnitStats.at(u, level + 1), ov) or nil
 
-	gui.name.Text = u.name .. (u.unique and "  ★" or "")
+	gui.name.Text = u.name .. (u.unique and "  [Unique]" or "")
 	gui.level.Text = "Lv " .. level .. "/" .. maxL
 	local lines = {
 		statLine("Damage", st.damage, nx and nx.damage),
@@ -179,7 +180,7 @@ end
 
 function UnitPanel.init(cash, upEv, sellEv, targetEv)
 	cashValue, upgradeEvent, sellEvent, targetEvent = cash, upEv, sellEv, targetEv
-	local screen = make("ScreenGui", { Name = "UnitPanel", ResetOnSpawn = false }, player:WaitForChild("PlayerGui"))
+	local screen = make("ScreenGui", { Name = "UnitPanel", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling }, player:WaitForChild("PlayerGui"))
 	local panel = make("Frame", {
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 20, 0.5, 0),
@@ -189,7 +190,7 @@ function UnitPanel.init(cash, upEv, sellEv, targetEv)
 		Visible = false,
 	}, screen)
 	round(panel, 14)
-	make("UIStroke", { Color = Color3.fromRGB(90, 90, 120), Thickness = 2 }, panel)
+	Shape.get(panel).setEdge(Color3.fromRGB(130, 110, 255), 1.5)
 	gui.panel = panel
 
 	gui.name = text({ Position = UDim2.fromOffset(16, 12), Size = UDim2.fromOffset(200, 28) }, panel)
@@ -258,7 +259,7 @@ function UnitPanel.init(cash, upEv, sellEv, targetEv)
 	}, clip)
 	round(gui.side, 14)
 	Theme.stroke(gui.side, 3)
-	make("UIStroke", { Thickness = 2, Color = NEON, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, gui.side)
+	Shape.get(gui.side).setEdge(NEON, 1.5)
 	gui.sideTitle = Theme.label({ Position = UDim2.fromOffset(12, 10), Size = UDim2.new(1, -24, 0, 30), TextColor3 = NEON, TextXAlignment = Enum.TextXAlignment.Left }, gui.side)
 	gui.sideText = Theme.label({
 		Position = UDim2.fromOffset(12, 48), Size = UDim2.new(1, -24, 1, -84),

@@ -292,7 +292,7 @@ function SettingsUI.init()
 	local player = Players.LocalPlayer
 	local screen = Theme.make("ScreenGui", { Name = "Settings", ResetOnSpawn = false, DisplayOrder = 20, ZIndexBehavior = Enum.ZIndexBehavior.Sibling }, player:WaitForChild("PlayerGui"))
 	build(screen)
-	local holder = Button.new({ name = "Settings", icon = "⚙", size = 64, color = ACCENT, onClick = SettingsUI.toggle }, screen)
+	local holder = Button.new({ name = "Settings", size = 64, color = ACCENT, onClick = SettingsUI.toggle }, screen)
 	holder.AnchorPoint = Vector2.new(0, 1)
 	holder.Position = UDim2.new(0, 16, 1, -16)
 	UIS.InputBegan:Connect(function(input)

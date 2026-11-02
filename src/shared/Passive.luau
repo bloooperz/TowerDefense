@@ -1,7 +1,7 @@
 -- PURE passive-description formatting. Unit defs declare:
---   passive = { name = "...", icon = "🐕"?, describe = "template with {key} / {key:ord}" | function(levelStats) -> string }
+--   passive = { name = "...", describe = "template with {key} / {key:ord}" | function(levelStats) -> string }
 -- {key} looks up levelStats.ability[key] then levelStats[key] (UnitStats.at output). {key:ord} -> "3rd".
--- describe(unit, stats, nextStats?) returns plain text, rich text (changed values shown "40 → 55" in green),
+-- describe(unit, stats, nextStats?) returns plain text, rich text (changed values shown "40 -> 55" in green),
 -- and a list of problems (missing fields/keys) for the caller to log + toast.
 local Passive = {}
 Passive.CHANGED_COLOR = "#5CFF8A"
@@ -94,7 +94,7 @@ function Passive.describe(u, st, nx)
 			return "?"
 		end
 		if n ~= nil and n ~= v then
-			return ('<font color="%s">%s → %s</font>'):format(Passive.CHANGED_COLOR, render(v, mod), render(n, mod))
+			return ('<font color="%s">%s -> %s</font>'):format(Passive.CHANGED_COLOR, render(v, mod), render(n, mod))
 		end
 		return ('<font color="%s">%s</font>'):format(Passive.VALUE_COLOR, render(v, mod))
 	end)

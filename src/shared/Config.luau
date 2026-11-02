@@ -39,8 +39,6 @@ Config.RARITY_COLORS = {
 	Mythic = Color3.fromRGB(255, 60, 120),
 }
 Config.DAMAGE_TYPE_COLORS = { Physical = Color3.fromRGB(230, 120, 50), Magical = Color3.fromRGB(150, 90, 255) }
-Config.DAMAGE_TYPE_ICONS = { Physical = "⚔️", Magical = "🔮" }
-Config.ELEMENT_ICONS = { Fire = "🔥", Ice = "❄️", Lightning = "⚡", Shadow = "🌑", Water = "💧", Wind = "🌪️", Earth = "🪨", Light = "✨" }
 Config.ELEMENT_COLORS = {
 	Fire = Color3.fromRGB(255, 90, 40), Ice = Color3.fromRGB(140, 220, 255), Lightning = Color3.fromRGB(255, 230, 60),
 	Shadow = Color3.fromRGB(150, 70, 200), Water = Color3.fromRGB(40, 130, 255), Wind = Color3.fromRGB(150, 240, 180),

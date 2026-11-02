@@ -6,6 +6,7 @@ local Config = require(Shared.Config)
 local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
 local MyUnits = require(script.Parent.MyUnits)
+local Style = require(script.Parent.Style)
 
 local Hotbar = {}
 local slots, counts = {}, {}
@@ -46,12 +47,10 @@ local function rebuild()
 		b.Size, b.BackgroundColor3 = UDim2.fromOffset(80, 80), Color3.fromRGB(40, 40, 50)
 		b.TextColor3, b.TextScaled = Color3.new(1, 1, 1), true
 		b.Text = i .. "\n" .. u.name .. "\n$" .. u.cost
-		b.Font = Enum.Font.FredokaOne
+		b.Font = Style.FONT
 		b.LayoutOrder = i
-		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
-		local stroke = Instance.new("UIStroke", b)
-		stroke.Thickness, stroke.Color = 3, Color3.new(0, 0, 0)
-		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		b.BackgroundColor3 = Style.MID
+		local stroke = Style.shape(b, 8, Style.STROKE)
 		b.MouseButton1Click:Connect(function()
 			if Hotbar.onSelect then
 				Hotbar.onSelect(i)
@@ -59,7 +58,7 @@ local function rebuild()
 		end)
 		local c = Instance.new("TextLabel")
 		c.AnchorPoint, c.Position, c.Size = Vector2.new(1, 0), UDim2.new(1, -4, 0, 2), UDim2.fromOffset(34, 16)
-		c.BackgroundTransparency, c.TextScaled, c.Font = 1, true, Enum.Font.FredokaOne
+		c.BackgroundTransparency, c.TextScaled, c.Font = 1, true, Enum.Font.GothamBlack
 		c.TextColor3 = Color3.fromRGB(200, 200, 210)
 		c.Parent = b
 		counts[i], slots[i] = c, stroke
@@ -70,6 +69,7 @@ end
 
 function Hotbar.init()
 	local screen = Instance.new("ScreenGui")
+	screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling -- UI/Shape relies on children drawing over parents
 	screen.Name, screen.ResetOnSpawn = "TDGui", false
 	screen.Parent = player:WaitForChild("PlayerGui")
 	local bar = Instance.new("Frame")
@@ -99,7 +99,7 @@ end
 
 function Hotbar.highlight(index)
 	for i, s in ipairs(slots) do
-		s.Color = (i == index) and Color3.fromRGB(255, 220, 0) or Color3.new(0, 0, 0)
+		s.setEdge((i == index) and Color3.fromRGB(255, 220, 0) or Style.STROKE, (i == index) and 2 or 1.5)
 	end
 end
 
