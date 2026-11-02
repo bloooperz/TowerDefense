@@ -28,7 +28,7 @@ Config.STARTER_LOADOUT = { "Basic" } -- loading placeholder cards + safety refil
 Config.TICK_RATE = 0.1 -- seconds between server simulation ticks
 
 -- Bump on notable pushes; server + client print it so stale Studio scripts are obvious.
-Config.BUILD = "foundation-2"
+Config.BUILD = "starter-fix-3" -- bump on fixes; client warns if its copy differs from the server's
 
 -- Display metadata (lobby/hotbar cards). Combat ignores these for now.
 Config.RARITY_COLORS = {

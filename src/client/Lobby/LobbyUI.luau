@@ -29,6 +29,14 @@ if type(progressFn) ~= "function" then
 		return 1, 0, 100
 	end
 end
+for _, fname in ipairs({ "levelBar", "slots" }) do -- same stale-sync guard for shared/LoadoutView
+	if type(LoadoutView[fname]) ~= "function" then
+		log.error("LoadoutView." .. fname .. " is missing: src/shared/LoadoutView.luau is STALE (git pull / re-sync Rojo)")
+	end
+end
+if type(Card.new) ~= "function" then
+	log.error("Card.new is missing: src/client/UI/Card.luau is STALE (re-sync Rojo)")
+end
 local player = Players.LocalPlayer
 local LobbyUI = {}
 

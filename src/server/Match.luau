@@ -22,6 +22,7 @@ local Log = require(Shared.Log)
 local PlacementRules = require(Shared.PlacementRules)
 local Cash = require(Shared.Cash)
 local log = Log.new("Match")
+local netlog = Log.new("Net")
 
 local Match = {}
 -- Studio dev hooks (server/Dev.luau). godMode: leaks don't hurt the base. skipToken bumps abort the current wave.
@@ -682,10 +683,17 @@ function Match.init(infoFolder)
 	end)
 
 	Net.on("ClaimStarter", function(plr, unitId)
-		local why = PlayerData.claimStarter(plr, unitId)
+		netlog.info("ClaimStarter received from", plr.Name, unitId)
+		local ok, why = Log.try("Match", "claimStarter", PlayerData.claimStarter, plr, unitId)
+		if not ok then
+			why = "Server error (ClaimStarter)"
+		end
+		Net.fire("ClaimStarterResult", plr, why == nil, why) -- always reply, success or reason
 		if why then
+			netlog.warn("ClaimStarter rejected for", plr.Name, ":", why)
 			return why
 		end
+		netlog.info("ClaimStarter granted", unitId, "to", plr.Name, "-> replied ok")
 		Net.fire("Notify", plr, ("Starter chosen: %s (+%d Gems)"):format(unitId, require(Shared.Summon).STARTER_GEMS), "info")
 		return nil
 	end)

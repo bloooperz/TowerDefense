@@ -29,6 +29,7 @@ Net.DEFS = {
 	Summon = { dir = "c2s", args = { "number" }, rate = 1 }, -- (tier 1/10/50) shared/Summon
 	ClaimStarter = { dir = "c2s", args = { "string" }, rate = 1 }, -- (unitId) first-load starter pick
 	SellOwnedUnit = { dir = "c2s", args = { "string" }, rate = 4 }, -- (unitUid) sell owned unit for Gold
+	ClaimStarterResult = { dir = "s2c" }, -- (ok: boolean, reason: string?) explicit reply to ClaimStarter
 	SummonResult = { dir = "s2c" }, -- { results = { {unitId, rarity, uid?, sold?} }, gems, gold, pity, back }
 	DamageNumber = { dir = "s2c", unreliable = true }, -- (pos, amount, crit) to the attacking player
 	MatchState = { dir = "s2c" },
@@ -125,6 +126,7 @@ end
 -- Handlers return nil on success or a player-facing reason string on rejection.
 -- Rejections are logged with player + action and sent to the client as a toast.
 -- Handler errors are caught with a traceback and reported as "Server error".
+Net.connected = {} -- server: names with a Net.on handler (logged at startup)
 local rateWarned = {}
 function Net.on(name, fn)
 	local def = Net.DEFS[name]
@@ -132,6 +134,7 @@ function Net.on(name, fn)
 	if def.studioOnly and not RunService:IsStudio() then
 		return -- remote does not exist in published builds
 	end
+	table.insert(Net.connected, name)
 	remote(name).OnServerEvent:Connect(function(plr, ...)
 		if not allow(plr, name, def.rate or 5) then
 			local k = plr.UserId .. name
