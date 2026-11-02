@@ -1,8 +1,11 @@
 -- Persistent player profiles.
 --  * DataStore record: { data = <profile>, lock = { job, time } }  (session lock)
---  * Load: UpdateAsync claims the lock; if another live server holds it, retry with backoff,
---    and steal it on the final attempt (or if older than LOCK_TIMEOUT).
---  * Save: only writes while we still own the lock. Release on leave + BindToClose.
+--  * Load: UpdateAsync claims the lock; if another live server holds it, wait (backoff) until it
+--    is released or goes stale (LOCK_TIMEOUT). Never force-steal a live lock: after LOCK_WAIT
+--    seconds we kick the player with a clear message instead.
+--  * Save: retried with exponential backoff (SAVE_ATTEMPTS, 1s/2s/4s...), incl. leave + BindToClose
+--    (bounded by CLOSE_BUDGET). Only writes while we still own the lock; if another server has
+--    taken the session (lost lock) we stop saving the stale copy and reload or kick.
 --  * Studio without API access (or any DataStore error at boot) falls back to an in-memory mock.
 --  * Schema/migrations live in shared/DataSchema (pure, unit tested).
 local Players = game:GetService("Players")
@@ -24,7 +27,17 @@ local PlayerData = {}
 PlayerData.STORE_NAME = "Profiles_v1"
 PlayerData.LOCK_TIMEOUT = 600
 PlayerData.AUTOSAVE = 60
-PlayerData.LOAD_ATTEMPTS = 5
+PlayerData.LOAD_ATTEMPTS = 5 -- DataStore *errors* tolerated while loading
+PlayerData.LOCK_WAIT = 90 -- seconds to wait for another server's live lock before kicking
+PlayerData.SAVE_ATTEMPTS = 4
+PlayerData.SAVE_BACKOFF = 1 -- 1s, 2s, 4s between save attempts
+PlayerData.CLOSE_BUDGET = 25 -- BindToClose gives ~30s; keep margin
+PlayerData.LOCKED_KICK = "Your data is still open on another server. Please wait a minute and rejoin."
+PlayerData.LOST_KICK = "Your session was opened on another server. Please rejoin to load your latest data."
+PlayerData._sleep = function(s) -- overridable in tests
+	task.wait(s)
+end
+PlayerData._clock = os.clock
 
 local profiles = {} -- [player] = data
 local changedListeners = {}
@@ -122,19 +135,32 @@ local function replicate(plr, d)
 	end
 end
 
-local function load(plr)
-	for attempt = 1, PlayerData.LOAD_ATTEMPTS do
-		local steal = attempt == PlayerData.LOAD_ATTEMPTS
-		local result
+-- Is `lock` held by a different, live server?
+local function lockedByOther(lock, now)
+	return lock ~= nil and lock.job ~= jobId and now - (lock.time or 0) < PlayerData.LOCK_TIMEOUT
+end
+
+-- Load + claim the session lock. Never steals a live lock.
+-- Returns data, or nil + "locked" | "error". `maxWait` (seconds) caps waiting on a lock (default LOCK_WAIT).
+local function load(plr, maxWait)
+	maxWait = maxWait or PlayerData.LOCK_WAIT
+	local started = PlayerData._clock()
+	local errors, attempt = 0, 0
+	while true do
+		attempt += 1
+		local result, held
 		local ok, err = pcall(function()
 			store:UpdateAsync(key(plr), function(rec)
 				rec = rec or {}
-				local lock = rec.lock
 				local now = os.time()
-				if lock and lock.job ~= jobId and now - lock.time < PlayerData.LOCK_TIMEOUT and not steal then
-					result = nil
-					return nil -- cancel write
+				if lockedByOther(rec.lock, now) then
+					result, held = nil, rec.lock
+					return nil -- cancel write; wait for release/stale
 				end
+				if rec.lock and rec.lock.job ~= jobId then
+					log.warn("taking STALE lock for", plr.Name, "from", rec.lock.job, "age", now - (rec.lock.time or 0))
+				end
+				held = nil
 				rec.data = DataSchema.migrate(rec.data, genUid, Config.STARTER_LOADOUT, Config.LOADOUT_SIZE)
 				for _, u in pairs(rec.data.units) do
 					UnitLevel.normalize(u) -- v4 migration may leave overflow; also repairs bad values
@@ -148,34 +174,100 @@ local function load(plr)
 		if ok and result then
 			return result
 		end
+		local reason
 		if not ok then
+			errors += 1
 			log.error("load failed for", plr.Name, "attempt", attempt, err)
+			if errors >= PlayerData.LOAD_ATTEMPTS then
+				return nil, "error"
+			end
+			reason = "error"
 		else
-			log.warn("profile for", plr.Name, "locked by another server; retry", attempt)
+			reason = "locked"
+			log.warn("profile for", plr.Name, "locked by another server", held and held.job, "; waiting (attempt", attempt .. ")")
 		end
-		task.wait(attempt * 2)
+		local delay = math.min(attempt * 2, 10)
+		if reason == "locked" and PlayerData._clock() - started + delay > maxWait then
+			log.warn("giving up on", plr.Name, ": still locked by another server after", math.floor(PlayerData._clock() - started), "s (not stealing)")
+			return nil, "locked"
+		end
+		if not plr.Parent then
+			return nil, "left"
+		end
+		PlayerData._sleep(delay)
 	end
-	return nil
 end
 
-local function save(plr, release)
+-- One UpdateAsync write. Returns "ok" | "lost" (another server owns the session) or errors.
+local function writeOnce(plr, d, release)
+	local status = "ok"
+	store:UpdateAsync(key(plr), function(rec)
+		rec = rec or {}
+		-- We always hold a lock after load; a missing or foreign lock means another server
+		-- took (and maybe released) the session, so our copy is stale. Don't clobber.
+		if rec.lock == nil or rec.lock.job ~= jobId then
+			status = "lost"
+			return nil
+		end
+		status = "ok"
+		rec.data = d
+		rec.lock = (not release) and { job = jobId, time = os.time() } or nil
+		return rec
+	end)
+	return status
+end
+
+-- Save with exponential backoff. `deadline` (os.clock-style, via _clock) bounds retries (BindToClose).
+-- Returns "ok" | "lost" | "failed" | nil (no profile).
+local function save(plr, release, deadline)
 	local d = profiles[plr]
 	if not d then
+		return nil
+	end
+	for attempt = 1, PlayerData.SAVE_ATTEMPTS do
+		local ok, res = pcall(writeOnce, plr, d, release)
+		if ok then
+			if res == "lost" then
+				log.warn("save for", plr.Name, "skipped: session lock is held by another server (lost lock); not writing stale data")
+			elseif attempt > 1 then
+				log.info("save for", plr.Name, "succeeded on attempt", attempt)
+			end
+			return res
+		end
+		local delay = PlayerData.SAVE_BACKOFF * 2 ^ (attempt - 1)
+		log.warn("save failed for", plr.Name, "attempt", attempt .. "/" .. PlayerData.SAVE_ATTEMPTS, res)
+		if attempt == PlayerData.SAVE_ATTEMPTS then
+			break
+		end
+		if deadline and PlayerData._clock() + delay > deadline then
+			log.warn("save for", plr.Name, ": out of shutdown time budget, no more retries")
+			break
+		end
+		PlayerData._sleep(delay)
+	end
+	log.error("save FAILED for", plr.Name, "after retries; progress since last save may be lost")
+	return "failed"
+end
+
+-- Another server owns the session: drop our stale copy, then reload fresh data if the lock is
+-- free/stale right now, else kick so the player rejoins onto fresh data.
+local function onLostLock(plr)
+	if not profiles[plr] then
 		return
 	end
-	local ok, err = pcall(function()
-		store:UpdateAsync(key(plr), function(rec)
-			rec = rec or {}
-			if rec.lock and rec.lock.job ~= jobId then
-				return nil -- another server took over; don't clobber
-			end
-			rec.data = d
-			rec.lock = (not release) and { job = jobId, time = os.time() } or nil
-			return rec
-		end)
-	end)
-	if not ok then
-		log.error("save failed for", plr.Name, err)
+	profiles[plr] = nil -- stop autosaving the stale copy immediately
+	log.warn("lost session lock for", plr.Name, "; dropping stale copy and reloading")
+	if not plr.Parent then
+		return
+	end
+	local fresh = load(plr, 0) -- single attempt, never steals
+	if fresh and plr.Parent then
+		profiles[plr] = fresh
+		replicate(plr, fresh)
+		log.info("reloaded fresh data for", plr.Name, "after lost lock")
+	else
+		log.warn("could not safely reacquire", plr.Name, "; kicking to rejoin")
+		plr:Kick(PlayerData.LOST_KICK)
 	end
 end
 
@@ -406,7 +498,7 @@ end
 
 function PlayerData.init()
 	local function added(plr)
-		local d = load(plr)
+		local d, why = load(plr)
 		if not plr.Parent then
 			if d then -- left while loading: release the lock we just took
 				profiles[plr] = d
@@ -416,7 +508,8 @@ function PlayerData.init()
 			return
 		end
 		if not d then
-			plr:Kick("Couldn't load your data. Please rejoin.")
+			log.warn("kicking", plr.Name, "load failed:", why)
+			plr:Kick(why == "locked" and PlayerData.LOCKED_KICK or "Couldn't load your data. Please rejoin.")
 			return
 		end
 		profiles[plr] = d
@@ -436,15 +529,15 @@ function PlayerData.init()
 	end)
 	game:BindToClose(function()
 		local pending = 0
+		local deadline = PlayerData._clock() + PlayerData.CLOSE_BUDGET
 		for plr in pairs(profiles) do
 			pending += 1
 			task.spawn(function()
-				save(plr, true)
+				save(plr, true, deadline)
 				pending -= 1
 			end)
 		end
-		local t = os.clock()
-		while pending > 0 and os.clock() - t < 25 do
+		while pending > 0 and PlayerData._clock() < deadline do
 			task.wait()
 		end
 	end)
@@ -452,10 +545,32 @@ function PlayerData.init()
 		while true do
 			task.wait(PlayerData.AUTOSAVE)
 			for plr in pairs(profiles) do
-				task.spawn(save, plr, false)
+				task.spawn(function()
+					if save(plr, false) == "lost" then
+						onLostLock(plr)
+					end
+				end)
 			end
 		end
 	end)
 end
+
+-- Test hooks (lune specs): internal functions + store injection. Not used by game code.
+PlayerData._test = {
+	load = function(...)
+		return load(...)
+	end,
+	save = function(...)
+		return save(...)
+	end,
+	onLostLock = function(...)
+		return onLostLock(...)
+	end,
+	profiles = profiles,
+	jobId = jobId,
+	setStore = function(s)
+		store = s
+	end,
+}
 
 return PlayerData
