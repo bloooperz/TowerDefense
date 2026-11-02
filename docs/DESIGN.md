@@ -126,3 +126,41 @@ event milestones; sink: opening for event units/skins) and **Quests** (gem fauce
 - Cosmetics, convenience (extra loadout presets), and battle-pass style tracks that are fully
   earnable through play are the preferred revenue paths.
 - Never sell capsules beyond the event cap.
+
+## Trading System — Implementation Plan (Deferred)
+
+Status: deferred, not started. Do not build this until the prerequisites below are met. Follow these steps exactly when it is picked up.
+
+### Core rules
+- Items never live in MemoryStore. MemoryStore is not permanent (data can be evicted or lost), and its quota is small: about 64KB + 1.2KB per player, so roughly 664KB for the whole game at 500 players.
+- Items stay in each player's saved data (the session-locked `Profiles_v1` DataStore profile). The swap happens in memory on the one server both players are on. Cross-server trades: teleport both players to one server first.
+- MemoryStore only handles the cross-server parts:
+  - per-player trade locks
+  - trade invites
+  - an optional public offer board later
+- No PvP. Trading is the only player-to-player interaction.
+- Level requirement: player level 10 (`PlayerLevel.UNLOCKS.Trade = 10` in `src/shared/PlayerLevel.luau`). Check it on the server with `PlayerData.checkUnlock(plr, "Trade")`.
+- Placeholders already exist: the pink Trading lobby circle and the Trade panel (`LobbyFeatures` / `LobbyUI` / `Theme`). Wire into them; don't create new ones.
+
+### Flow (server-authoritative)
+1. Request: player A invites player B (level gate checked for both; invite via MemoryStore inbox + MessagingService nudge if cross-server).
+2. Lock both players in MemoryStore with a 2-minute expiry (TTL 120s). Claim atomically with UpdateAsync, in userId order. If either lock is already taken, cancel. Never steal a lock.
+3. Offer units: each player adds/removes units in the Trade panel; the server holds the trade session in a Luau table.
+4. Both accept.
+5. 5-second countdown. Any change to either offer cancels both accepts and the countdown.
+6. Recheck: every offered unit is still owned by its player (by uid) and is not on the hotbar/loadout. Block fuse/feed on units that are in an active trade.
+7. Write a trade record to a separate DataStore (`Trades_v1`) with status `committed` (trade id, both userIds, both unit lists).
+8. Swap both players' items in one uninterrupted, non-yielding block (no waits or yields inside).
+9. Save both players immediately, using the save retries with backoff.
+10. Mark the trade record `done` and release both MemoryStore locks.
+
+### Crash recovery
+- If the server crashes between the two saves, the `committed` trade record lets the next server that loads either player finish the other player's half.
+- Each profile remembers the trade IDs it has already applied (`appliedTrades`), so applying a trade twice is a no-op and nothing duplicates.
+- On profile load: check `Trades_v1` for this player's `committed` trades not in `appliedTrades`, apply them, save, and mark `done` when both sides are applied.
+
+### Prerequisites (DONE)
+The three PlayerData fixes were required first and are done in commit `7d83550` (`src/server/Services/PlayerData.luau`):
+1. Save retries with exponential backoff, including on leave and BindToClose.
+2. No forced lock steal: wait for the lock to be released or go stale, otherwise kick.
+3. Reload on lost session: if another server takes over, stop saving the stale copy and reload or kick.
