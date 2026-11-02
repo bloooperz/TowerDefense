@@ -1,50 +1,87 @@
--- Hotbar of units with placed/max counts.
+-- Hotbar built from the player's loadout (Player attribute "Loadout" = "Basic,Sniper,...").
+-- Rebuilds whenever the loadout changes, so equip/unequip later needs no client changes here.
 local Players = game:GetService("Players")
-local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+local Shared = game:GetService("ReplicatedStorage").Shared
+local Config = require(Shared.Config)
+local Units = require(Shared.Units)
+local UnitStats = require(Shared.UnitStats)
 local MyUnits = require(script.Parent.MyUnits)
 
 local Hotbar = {}
-local slots = {}
-Hotbar.onSelect = nil -- function(index)
-local counts = {}
+local slots, counts = {}, {}
+Hotbar.ids = {} -- slot index -> unitId
+Hotbar.onSelect = nil -- function(slotIndex)
 
-function Hotbar.init()
-	local player = Players.LocalPlayer
-	local screen = Instance.new("ScreenGui")
-	screen.Name, screen.ResetOnSpawn = "TDGui", false
-	screen.Parent = player:WaitForChild("PlayerGui")
+local player = Players.LocalPlayer
 
-	local bar = Instance.new("Frame")
-	bar.AnchorPoint, bar.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -20)
-	bar.Size, bar.BackgroundTransparency, bar.Visible = UDim2.fromOffset(#Config.UNITS * 90, 90), 1, false
-	local layout = Instance.new("UIListLayout", bar)
-	layout.FillDirection, layout.Padding = Enum.FillDirection.Horizontal, UDim.new(0, 10)
-	bar.Parent = screen
-	Hotbar.bar = bar
+local function parseLoadout()
+	local ids = {}
+	local raw = player:GetAttribute("Loadout")
+	if raw and raw ~= "" then
+		for id in string.gmatch(raw, "[^,]+") do
+			if Units.get(id) and #ids < Config.LOADOUT_SIZE then
+				table.insert(ids, id)
+			end
+		end
+	else
+		ids = table.clone(Config.STARTER_LOADOUT)
+	end
+	return ids
+end
 
-	for i, u in ipairs(Config.UNITS) do
+local function rebuild()
+	local bar = Hotbar.bar
+	for _, c in ipairs(bar:GetChildren()) do
+		if c:IsA("GuiButton") then
+			c:Destroy()
+		end
+	end
+	table.clear(slots)
+	table.clear(counts)
+	Hotbar.ids = parseLoadout()
+	bar.Size = UDim2.fromOffset(#Hotbar.ids * 90, 90)
+	for i, id in ipairs(Hotbar.ids) do
+		local u = Units.get(id)
 		local b = Instance.new("TextButton")
 		b.Size, b.BackgroundColor3 = UDim2.fromOffset(80, 80), Color3.fromRGB(40, 40, 50)
 		b.TextColor3, b.TextScaled = Color3.new(1, 1, 1), true
 		b.Text = i .. "\n" .. u.name .. "\n$" .. u.cost
+		b.Font = Enum.Font.FredokaOne
+		b.LayoutOrder = i
 		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
 		local stroke = Instance.new("UIStroke", b)
 		stroke.Thickness, stroke.Color = 3, Color3.new(0, 0, 0)
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		b.MouseButton1Click:Connect(function()
 			if Hotbar.onSelect then
 				Hotbar.onSelect(i)
 			end
 		end)
-		b.Font = Enum.Font.FredokaOne
 		local c = Instance.new("TextLabel")
 		c.AnchorPoint, c.Position, c.Size = Vector2.new(1, 0), UDim2.new(1, -4, 0, 2), UDim2.fromOffset(34, 16)
 		c.BackgroundTransparency, c.TextScaled, c.Font = 1, true, Enum.Font.FredokaOne
 		c.TextColor3 = Color3.fromRGB(200, 200, 210)
 		c.Parent = b
-		counts[i] = c
+		counts[i], slots[i] = c, stroke
 		b.Parent = bar
-		slots[i] = stroke
 	end
+	Hotbar.refreshCounts()
+end
+
+function Hotbar.init()
+	local screen = Instance.new("ScreenGui")
+	screen.Name, screen.ResetOnSpawn = "TDGui", false
+	screen.Parent = player:WaitForChild("PlayerGui")
+	local bar = Instance.new("Frame")
+	bar.AnchorPoint, bar.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -20)
+	bar.BackgroundTransparency, bar.Visible = 1, false
+	local layout = Instance.new("UIListLayout", bar)
+	layout.FillDirection, layout.Padding = Enum.FillDirection.Horizontal, UDim.new(0, 10)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	bar.Parent = screen
+	Hotbar.bar = bar
+	rebuild()
+	player:GetAttributeChangedSignal("Loadout"):Connect(rebuild)
 	task.spawn(function()
 		while true do
 			if bar.Visible then
@@ -55,6 +92,11 @@ function Hotbar.init()
 	end)
 end
 
+function Hotbar.unitAt(i)
+	local id = Hotbar.ids[i]
+	return id and Units.get(id), id
+end
+
 function Hotbar.highlight(index)
 	for i, s in ipairs(slots) do
 		s.Color = (i == index) and Color3.fromRGB(255, 220, 0) or Color3.new(0, 0, 0)
@@ -62,8 +104,9 @@ function Hotbar.highlight(index)
 end
 
 function Hotbar.refreshCounts()
-	for i, u in ipairs(Config.UNITS) do
-		local n, max = MyUnits.count(i), Config.maxPlaced(u)
+	for i, id in ipairs(Hotbar.ids) do
+		local u = Units.get(id)
+		local n, max = MyUnits.count(id), UnitStats.maxPlaced(u)
 		counts[i].Text = n .. "/" .. max
 		counts[i].TextColor3 = n >= max and Color3.fromRGB(255, 90, 90) or Color3.fromRGB(200, 200, 210)
 	end

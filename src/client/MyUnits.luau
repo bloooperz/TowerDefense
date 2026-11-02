@@ -21,10 +21,10 @@ function MyUnits.list()
 	return out
 end
 
-function MyUnits.count(unitIndex)
+function MyUnits.count(unitId)
 	local n = 0
 	for _, p in ipairs(MyUnits.list()) do
-		if p:GetAttribute("UnitIndex") == unitIndex then
+		if p:GetAttribute("UnitType") == unitId then
 			n += 1
 		end
 	end

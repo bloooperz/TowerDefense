@@ -1,8 +1,11 @@
 -- Unit panel: click one of your placed units to view/upgrade/sell it.
--- Reads Level/UnitIndex/UnitId attributes the server sets on the unit part.
+-- Reads Level/UnitType/UnitId attributes the server sets on the unit part.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+local Shared = game:GetService("ReplicatedStorage").Shared
+local Config = require(Shared.Config)
+local Units = require(Shared.Units)
+local UnitStats = require(Shared.UnitStats)
 
 local UnitPanel = {}
 local player = Players.LocalPlayer
@@ -63,11 +66,15 @@ local function refresh()
 		UnitPanel.close()
 		return
 	end
-	local u = Config.UNITS[current:GetAttribute("UnitIndex")]
+	local u = Units.get(current:GetAttribute("UnitType"))
+	if not u then
+		UnitPanel.close()
+		return
+	end
 	local level = current:GetAttribute("Level") or 1
-	local maxL = Config.maxLevel(u)
-	local st = Config.statsAt(u, level)
-	local nx = level < maxL and Config.statsAt(u, level + 1) or nil
+	local maxL = UnitStats.maxLevel(u)
+	local st = UnitStats.at(u, level)
+	local nx = level < maxL and UnitStats.at(u, level + 1) or nil
 
 	gui.name.Text = u.name .. (u.unique and "  ★" or "")
 	gui.level.Text = "Lv " .. level .. "/" .. maxL

@@ -2,16 +2,24 @@
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
 local UIS = game:GetService("UserInputService")
-local Config = require(RS:WaitForChild("Shared"):WaitForChild("Config"))
 local Hotbar = require(script.Parent.Hotbar)
 local Placement = require(script.Parent.Placement)
 local UnitPanel = require(script.Parent.UnitPanel)
 local Hud = require(script.Parent.Hud)
 
-local remotes = RS:WaitForChild("Remotes")
-local placeEvent = remotes:WaitForChild("PlaceUnit")
-local startEvent = remotes:WaitForChild("StartGame")
-local stateEvent = remotes:WaitForChild("MatchState")
+local Net = require(RS:WaitForChild("Shared"):WaitForChild("Net"))
+local PathRenderer = require(script.Parent.PathRenderer)
+local MapSelect = require(script.Parent.MapSelect)
+local Results = require(script.Parent.Results)
+
+-- Remote shim so UnitPanel can keep calling :FireServer(...)
+local function sender(name)
+	return {
+		FireServer = function(_, ...)
+			Net.send(name, ...)
+		end,
+	}
+end
 
 local selected = nil
 local function clear()
@@ -22,7 +30,10 @@ end
 
 -- Build GUI and connect state BEFORE any other waits so no update is missed.
 Hotbar.init()
-stateEvent.OnClientEvent:Connect(function(s)
+PathRenderer.init()
+MapSelect.init()
+Results.init()
+Net.listen("MatchState", function(s)
 	Hotbar.setState(s)
 	Hud.setState(s)
 	if s == "lobby" then
@@ -32,7 +43,8 @@ stateEvent.OnClientEvent:Connect(function(s)
 end)
 
 local function select(i)
-	if not Hotbar.bar.Visible or not Config.UNITS[i] then
+	local u, id = Hotbar.unitAt(i)
+	if not Hotbar.bar.Visible or not u then
 		return
 	end
 	if selected == i then
@@ -41,12 +53,12 @@ local function select(i)
 	end
 	UnitPanel.close()
 	selected = i
-	Placement.start(Config.UNITS[i], i)
+	Placement.start(u, id)
 	Hotbar.highlight(i)
 end
 Hotbar.onSelect = select
 Hud.onVote = function()
-	startEvent:FireServer() -- toggles my vote
+	Net.send("Vote") -- toggles my vote
 end
 Hud.onUnitClicked = function(p)
 	clear()
@@ -56,7 +68,7 @@ end
 local cashValue = Players.LocalPlayer:WaitForChild("leaderstats"):WaitForChild("Cash")
 Placement.init(cashValue)
 Hud.init(cashValue)
-UnitPanel.init(cashValue, remotes:WaitForChild("UpgradeUnit"), remotes:WaitForChild("SellUnit"), remotes:WaitForChild("SetTargeting"))
+UnitPanel.init(cashValue, sender("UpgradeUnit"), sender("SellUnit"), sender("SetTargeting"))
 local mouse = Players.LocalPlayer:GetMouse()
 
 -- Find one of MY placed units under the mouse (unit part or its topper).
@@ -102,8 +114,9 @@ UIS.InputBegan:Connect(function(input, processed)
 			return
 		end
 		local pos = Placement.position()
-		if pos then
-			placeEvent:FireServer(selected, pos)
+		local _, id = Hotbar.unitAt(selected)
+		if pos and id then
+			Net.send("PlaceUnit", id, pos)
 		end
 		clear()
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1 then

@@ -2,14 +2,20 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
-local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+local Shared = game:GetService("ReplicatedStorage").Shared
+local Config = require(Shared.Config)
+local Maps = require(Shared.Maps)
+local UnitStats = require(Shared.UnitStats)
 local MyUnits = require(script.Parent.MyUnits)
 
 local Placement = {}
+local function RS_INFO()
+	return game:GetService("ReplicatedStorage"):WaitForChild("MatchInfo")
+end
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 local ghost, ring, unit, topper
-local cashValue, unitIndex
+local cashValue, unitId
 local tip, warn, flashUntil = nil, nil, 0
 
 -- Why the current spot can't be used, or nil if it can.
@@ -17,14 +23,14 @@ function Placement.reason()
 	if not ghost then
 		return nil
 	end
-	if MyUnits.count(unitIndex) >= Config.maxPlaced(unit) then
+	if MyUnits.count(unitId) >= UnitStats.maxPlaced(unit) then
 		return "Limit reached!"
 	end
 	if cashValue.Value < unit.cost then
 		return "Not enough money!"
 	end
 	local pos = ghost.Position
-	if not Config.isValidPlacement(pos, unit.size) or MyUnits.overlapsAny(pos, unit.size) then
+	if not Maps.isValidPlacement(Maps.get(RS_INFO():GetAttribute("MapId")), pos, unit.size) or MyUnits.overlapsAny(pos, unit.size) then
 		return "Invalid spot!"
 	end
 	return nil
@@ -66,7 +72,7 @@ function Placement.init(cash)
 			return
 		end
 		local p = mouse.Hit.Position
-		local pos = Vector3.new(math.round(p.X), Config.MAP_ORIGIN.Y + 0.5 + unit.size / 2, math.round(p.Z))
+		local pos = Vector3.new(math.round(p.X), Config.MAP_ORIGIN.Y + Config.GROUND_TOP + unit.size / 2, math.round(p.Z))
 		ghost.Position = pos
 		if topper then
 			topper.Position = pos + Vector3.new(0, unit.size / 2 + 0.2, 0)
@@ -97,9 +103,9 @@ function Placement.clear()
 	unit = nil
 end
 
-function Placement.start(u, index)
+function Placement.start(u, id)
 	Placement.clear()
-	unit, unitIndex = u, index
+	unit, unitId = u, id
 	ghost = Instance.new("Part")
 	ghost.Anchored, ghost.CanCollide, ghost.CanQuery = true, false, false
 	ghost.Size, ghost.Transparency, ghost.Color = Vector3.one * u.size, 0.5, Color3.new(1, 1, 1)

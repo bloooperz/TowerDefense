@@ -3,6 +3,7 @@
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
 local Config = require(RS.Shared.Config)
+local Units = require(RS.Shared.Units)
 local Style = require(script.Parent.Style)
 local MyUnits = require(script.Parent.MyUnits)
 
@@ -32,9 +33,10 @@ local function refresh()
 		ui.enemyFill.Size = UDim2.fromScale(1, 1)
 		ui.enemyLabel.Text = "Place your units!"
 	elseif ms == "over" then
-		ui.wave.Text = "GAME OVER"
+		ui.wave.Text = "Match over"
 	else
-		ui.wave.Text = "Wave " .. wave
+		local maxW = info:GetAttribute("MaxWaves") or 0
+		ui.wave.Text = "Wave " .. wave .. (maxW > 0 and ("/" .. maxW) or "")
 		ui.enemyFill.Size = UDim2.fromScale(total > 0 and left / total or 0, 1)
 		ui.enemyLabel.Text = left .. " enemies left"
 	end
@@ -58,7 +60,7 @@ local function refreshUnits()
 		end
 	end
 	for _, p in ipairs(MyUnits.list()) do
-		local u = Config.UNITS[p:GetAttribute("UnitIndex")]
+		local u = Units.get(p:GetAttribute("UnitType"))
 		if u then
 			local b = Style.make("TextButton", {
 				Size = UDim2.new(1, 0, 0, 24),
