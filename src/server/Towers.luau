@@ -1,55 +1,45 @@
--- Placed units, shooting loop, and a pooled shot-beam effect.
-local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+-- Placed units: attack loop (driven by the server tick) and the ability host.
+-- Ability hooks (all optional, all pcall-guarded so one bad ability can't break a match):
+--   onPlace(), onAttack(target), onTick(dt), onUpgrade(level), onEnemyKilled(enemy, source),
+--   onWaveStart(wave), cleanup()
+local Shared = game:GetService("ReplicatedStorage").Shared
+local Config = require(Shared.Config)
+local Units = require(Shared.Units)
+local UnitStats = require(Shared.UnitStats)
 local World = require(script.Parent.World)
 local Enemies = require(script.Parent.Enemies)
+local Api = require(script.Parent.AbilityApi)
 
 local Towers = {}
-Towers.placed = {} -- list of tower records
-
-local FAR = CFrame.new(0, -500, 0)
-local pool = {}
-local function getBeam()
-	local b = table.remove(pool)
-	if not b then
-		b = World.part({
-			Name = "Shot",
-			Size = Vector3.new(0.3, 0.3, 1),
-			CanCollide = false,
-			CanQuery = false,
-			CanTouch = false,
-			Color = Color3.new(1, 1, 0),
-			Material = Enum.Material.Neon,
-			CFrame = FAR,
-		}, World.runtime)
-	end
-	return b
-end
-
-local function shoot(from, to)
-	local b = getBeam()
-	local dist = (to - from).Magnitude
-	b.Size = Vector3.new(0.3, 0.3, dist)
-	b.CFrame = CFrame.lookAt(from, to) * CFrame.new(0, 0, -dist / 2)
-	task.delay(0.08, function()
-		if b.Parent then
-			b.CFrame = FAR
-			table.insert(pool, b)
-		end
-	end)
-end
-
+Towers.placed = {}
 Towers.byId = {}
 local nextId = 0
-
 local abilityFolder = script.Parent:WaitForChild("Abilities")
 
-function Towers.place(unitIndex, pos, owner)
-	local u = Config.UNITS[unitIndex]
+local function hook(t, name, ...)
+	local a = t.ability
+	if a and a[name] then
+		local ok, err = pcall(a[name], a, ...)
+		if not ok then
+			warn(("[Ability %s.%s] %s"):format(t.unit.id, name, tostring(err)))
+		end
+	end
+end
+Towers.hook = hook
+
+function Towers.broadcast(name, ...)
+	for _, t in ipairs(Towers.placed) do
+		hook(t, name, ...)
+	end
+end
+
+function Towers.place(unitId, pos, owner)
+	local u = Units.get(unitId)
 	local p = World.part({
 		Name = u.name,
 		Size = Vector3.one * u.size,
 		Position = pos,
-		Color = Color3.new(1, 1, 1),
+		Color = u.color or Color3.new(1, 1, 1),
 	}, World.runtime)
 	if u.topper then
 		World.part({
@@ -62,11 +52,11 @@ function Towers.place(unitIndex, pos, owner)
 	end
 	nextId += 1
 	local t = {
-		id = nextId, part = p, unit = u, alive = true, owner = owner, index = unitIndex,
-		attacks = 0, level = 1, spent = u.cost, stats = Config.statsAt(u, 1),
+		id = nextId, part = p, unit = u, alive = true, owner = owner, unitId = unitId,
+		attacks = 0, level = 1, spent = u.cost, stats = UnitStats.at(u, 1), cooldown = 0,
 	}
 	p:SetAttribute("UnitId", t.id)
-	p:SetAttribute("UnitIndex", unitIndex)
+	p:SetAttribute("UnitType", unitId)
 	p:SetAttribute("OwnerId", owner and owner.UserId or 0)
 	p:SetAttribute("Level", 1)
 	p:SetAttribute("Spent", t.spent)
@@ -84,28 +74,52 @@ function Towers.place(unitIndex, pos, owner)
 	t.levelLabel = lbl
 
 	if u.ability then
-		t.ability = require(abilityFolder:WaitForChild(u.ability)).new(t, t.stats.ability)
+		local mod = abilityFolder:FindFirstChild(u.ability)
+		if mod then
+			local ok, res = pcall(function()
+				return require(mod).new(t, t.stats.ability, Api)
+			end)
+			if ok then
+				t.ability = res
+			else
+				warn("[Ability " .. u.ability .. ".new] " .. tostring(res))
+			end
+		else
+			warn("Missing ability module " .. u.ability)
+		end
 	end
 	table.insert(Towers.placed, t)
 	Towers.byId[t.id] = t
-	task.spawn(function()
-		while t.alive do
-			local st = t.stats
-			local target = Enemies.pick(p.Position, st.range, p:GetAttribute("Targeting"))
-			if target then
-				shoot(p.Position, Enemies.position(target))
-				Enemies.damage(target, st.damage)
-				t.attacks += 1
-				if t.ability and t.ability.onAttack then
-					t.ability:onAttack(target)
-				end
-				task.wait(t.stats.rate)
-			else
-				task.wait(0.1)
-			end
-		end
-	end)
+	hook(t, "onPlace")
 	return t
+end
+
+local function attack(t, target)
+	local pos = t.part.Position
+	Api.beam(pos, Enemies.position(target), t.unit.beamColor)
+	Api.damage(t, target, t.stats.damage, {
+		armorPen = t.unit.armorPen,
+		critChance = t.unit.critChance,
+		critMult = t.unit.critMult,
+	})
+	t.attacks += 1
+	hook(t, "onAttack", target)
+end
+
+function Towers.tick(dt)
+	for _, t in ipairs(Towers.placed) do
+		if t.alive then
+			t.cooldown -= dt
+			if t.cooldown <= 0 then
+				local target = Enemies.pick(t.part.Position, t.stats.range, t.part:GetAttribute("Targeting"), t.unit.hitsAir)
+				if target then
+					attack(t, target)
+					t.cooldown = math.max(t.cooldown, -Config.TICK_RATE) + t.stats.rate
+				end
+			end
+			hook(t, "onTick", dt)
+		end
+	end
 end
 
 function Towers.overlaps(pos, size)
@@ -119,34 +133,30 @@ function Towers.overlaps(pos, size)
 	return false
 end
 
--- Returns upgrade cost, or nil if maxed.
 function Towers.upgradeCost(t)
-	local up = t.unit.upgrades and t.unit.upgrades[t.level]
-	return up and up.cost
+	return UnitStats.upgradeCost(t.unit, t.level)
 end
 
 function Towers.upgrade(t)
 	t.spent += Towers.upgradeCost(t)
 	t.level += 1
-	t.stats = Config.statsAt(t.unit, t.level)
+	t.stats = UnitStats.at(t.unit, t.level)
 	if t.ability then
 		t.ability.cfg = t.stats.ability
 	end
 	t.part:SetAttribute("Level", t.level)
 	t.part:SetAttribute("Spent", t.spent)
 	t.levelLabel.Text = "Lv " .. t.level
+	hook(t, "onUpgrade", t.level)
 end
 
 local function destroy(t)
 	t.alive = false
-	if t.ability and t.ability.cleanup then
-		t.ability:cleanup()
-	end
+	hook(t, "cleanup")
 	t.part:Destroy()
 	Towers.byId[t.id] = nil
 end
 
--- Removes the tower and returns the refund amount.
 function Towers.sell(t)
 	local i = table.find(Towers.placed, t)
 	if i then
@@ -156,14 +166,24 @@ function Towers.sell(t)
 	return math.floor(t.spent * Config.SELL_REFUND)
 end
 
-function Towers.countFor(owner, unitIndex)
+function Towers.countFor(owner, unitId)
 	local n = 0
 	for _, t in ipairs(Towers.placed) do
-		if t.owner == owner and t.index == unitIndex then
+		if t.owner == owner and t.unitId == unitId then
 			n += 1
 		end
 	end
 	return n
+end
+
+function Towers.removeOwner(owner)
+	for i = #Towers.placed, 1, -1 do
+		local t = Towers.placed[i]
+		if t.owner == owner then
+			table.remove(Towers.placed, i)
+			destroy(t)
+		end
+	end
 end
 
 function Towers.clear()
