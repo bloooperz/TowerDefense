@@ -38,6 +38,7 @@ if type(Card.new) ~= "function" then
 	log.error("Card.new is missing: src/client/UI/Card.luau is STALE (re-sync Rojo)")
 end
 local player = Players.LocalPlayer
+log.info("LobbyUI module loaded:", script:GetFullName(), "rev cdb3095+ (line 167 = Theme.panel in levelBar)")
 local LobbyUI = {}
 
 local LEFT = {

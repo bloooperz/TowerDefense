@@ -8,6 +8,12 @@ local log = Log.new("Main")
 
 log.info("server starting, build", Config.BUILD)
 Net.initServer()
+do
+	local dup = require(Shared.Diagnostics).duplicates({ game:GetService("ServerScriptService"), RS, game:GetService("StarterPlayer"), game:GetService("ReplicatedFirst"), game:GetService("StarterGui") }, { "Server", "Client", "LobbyUI", "Match", "Remotes", "Shared" })
+	for n, list in pairs(dup) do
+		log.warn("DUPLICATE '" .. n .. "' in the place (" .. #list .. " copies): " .. table.concat(list, " | "))
+	end
+end
 
 local info = Instance.new("Folder")
 info.Name = "MatchInfo"

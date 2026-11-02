@@ -51,6 +51,7 @@ Net.DEFS = {
 }
 
 local folder
+local staleWarned = {}
 local remotes = {}
 
 local function bad(v, maxLen)
@@ -96,8 +97,17 @@ local function allow(plr, name, rate)
 end
 
 function Net.initServer()
+	-- A Remotes folder saved in the place file (old session/plugin) would let the client
+	-- WaitForChild the OLD folder and fire into remotes nobody listens to. Remove every one.
+	for _, old in ipairs(RS:GetChildren()) do
+		if old.Name == "Remotes" then
+			log.warn("destroying stale ReplicatedStorage.Remotes saved in the place (" .. #old:GetChildren() .. " children)")
+			old:Destroy()
+		end
+	end
 	folder = Instance.new("Folder")
 	folder.Name = "Remotes"
+	folder:SetAttribute("ServerOwned", true) -- client only uses the folder the live server created
 	for name in pairs(Net.DEFS) do
 		if Net.DEFS[name].studioOnly and not RunService:IsStudio() then
 			continue
@@ -117,7 +127,19 @@ end
 local function remote(name)
 	if not remotes[name] then
 		assert(Net.DEFS[name], "unknown remote " .. name)
-		folder = folder or RS:WaitForChild("Remotes")
+		while not folder do
+			for _, f in ipairs(RS:GetChildren()) do
+				if f.Name == "Remotes" and f:GetAttribute("ServerOwned") then
+					folder = f
+				elseif f.Name == "Remotes" and not staleWarned[f] then
+					staleWarned[f] = true
+					log.warn("ignoring stale Remotes folder without ServerOwned:", f:GetFullName())
+				end
+			end
+			if not folder then
+				task.wait(0.1)
+			end
+		end
 		remotes[name] = folder:WaitForChild(name)
 	end
 	return remotes[name]

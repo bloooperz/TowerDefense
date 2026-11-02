@@ -18,6 +18,13 @@ local Input = require(script.Parent.Input)
 local SettingsUI = require(script.Parent.Settings.SettingsUI)
 local Log = require(RS.Shared.Log)
 local log = Log.new("Client")
+do -- duplicate-copy check: an old Client folder/LobbyUI saved in the place also runs
+	local ps = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerScripts")
+	local dup = require(RS.Shared.Diagnostics).duplicates({ ps, RS, game:GetService("ReplicatedFirst"), game:GetService("StarterPlayer"), game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui") }, { "Client", "LobbyUI", "Main", "Remotes", "Shared" })
+	for n, list in pairs(dup) do
+		log.warn("DUPLICATE '" .. n .. "' (" .. #list .. " copies, old ones still run): " .. table.concat(list, " | "))
+	end
+end
 log.info("client starting, build", require(RS.Shared.Config).BUILD, "server build", RS:WaitForChild("MatchInfo"):GetAttribute("Build"))
 
 -- Remote shim so UnitPanel can keep calling :FireServer(...)
