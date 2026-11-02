@@ -6,6 +6,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
+local UnitLevel = require(Shared.UnitLevel)
 local Traits = require(Shared.Traits)
 local Passive = require(Shared.Passive)
 local Log = require(Shared.Log)
@@ -121,11 +122,13 @@ local function refresh()
 		damage = current:GetAttribute("OvDamage"), range = current:GetAttribute("OvRange"),
 		rate = current:GetAttribute("OvRate"), trait = current:GetAttribute("Trait"),
 	} or nil
-	local st = Traits.resolve(UnitStats.at(u, level), ov)
-	local nx = level < maxL and Traits.resolve(UnitStats.at(u, level + 1), ov) or nil
+	-- account level multiplies damage only (same shared helper as server Towers.resolveStats)
+	local acct = current:GetAttribute("AccountLevel") or 1
+	local st = UnitLevel.applyDamage(Traits.resolve(UnitStats.at(u, level), ov), acct, ov)
+	local nx = level < maxL and UnitLevel.applyDamage(Traits.resolve(UnitStats.at(u, level + 1), ov), acct, ov) or nil
 
 	gui.name.Text = u.name .. (u.unique and "  [Unique]" or "")
-	gui.level.Text = "Lv " .. level .. "/" .. maxL
+	gui.level.Text = ("Tier %d/%d  |  Acct Lv %d (x%.2f dmg)"):format(level, maxL, acct, UnitLevel.damageMult(acct))
 	local lines = {
 		statLine("Damage", st.damage, nx and nx.damage),
 		statLine("Range", st.range, nx and nx.range),

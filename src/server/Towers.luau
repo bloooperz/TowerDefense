@@ -6,6 +6,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
+local UnitLevel = require(Shared.UnitLevel)
 local Traits = require(Shared.Traits)
 local World = require(script.Parent.World)
 local Enemies = require(script.Parent.Enemies)
@@ -36,7 +37,8 @@ end
 -- The ONE place tower stats are resolved: level table, then per-tower overrides (sandbox).
 -- Called on place and on every upgrade, so overrides persist. Ticks only read t.stats.
 local function resolveStats(t)
-	t.stats = Traits.resolve(UnitStats.at(t.unit, t.level), t.overrides)
+	-- account level (owned instance, 1..80) multiplies DAMAGE ONLY, on top of the in-match tier
+	t.stats = UnitLevel.applyDamage(Traits.resolve(UnitStats.at(t.unit, t.level), t.overrides), t.accountLevel, t.overrides)
 	if t.ability then
 		t.ability.cfg = t.stats.ability
 	end
@@ -48,7 +50,8 @@ end
 Towers.resolveStats = resolveStats
 
 -- opts (optional, dev sandbox): { level = n, overrides = { damage, range, rate, trait } }
-function Towers.place(unitId, pos, owner, opts)
+-- accountLevel: owned unit level (PlayerData.unitLevelFor); nil = 1 (sandbox).
+function Towers.place(unitId, pos, owner, opts, accountLevel)
 	local u = Units.get(unitId)
 	local p = World.part({
 		Name = u.name,
@@ -74,6 +77,8 @@ function Towers.place(unitId, pos, owner, opts)
 	p:SetAttribute("UnitType", unitId)
 	p:SetAttribute("OwnerId", owner and owner.UserId or 0)
 	p:SetAttribute("Level", 1)
+	t.accountLevel = UnitLevel.clampLevel(accountLevel)
+	p:SetAttribute("AccountLevel", t.accountLevel)
 	p:SetAttribute("Spent", t.spent)
 	p:SetAttribute("Targeting", "First")
 	if opts then

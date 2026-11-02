@@ -41,13 +41,25 @@ local function rebuild()
 	table.clear(slots)
 	table.clear(counts)
 	Hotbar.ids = parseLoadout()
+	-- account level per unit id (strongest equipped copy), from the parallel LoadoutLevels attr
+	local acctLevels = {}
+	do
+		local lp = game:GetService("Players").LocalPlayer
+		local ids, i = string.split(lp:GetAttribute("Loadout") or "", ","), 0
+		for l in string.gmatch(lp:GetAttribute("LoadoutLevels") or "", "[^,]+") do
+			i += 1
+			if ids[i] then
+				acctLevels[ids[i]] = math.max(acctLevels[ids[i]] or 1, tonumber(l) or 1)
+			end
+		end
+	end
 	bar.Size = UDim2.fromOffset(#Hotbar.ids * 90, 90)
 	for i, id in ipairs(Hotbar.ids) do
 		local u = Units.get(id)
 		local b = Instance.new("TextButton")
 		b.Size, b.BackgroundColor3 = UDim2.fromOffset(80, 80), Color3.fromRGB(40, 40, 50)
 		b.TextColor3, b.TextScaled = Color3.new(1, 1, 1), true
-		b.Text = i .. "\n" .. u.name .. "\n$" .. u.cost
+		b.Text = i .. "  Lv " .. (acctLevels[id] or 1) .. "\n" .. u.name .. "\n$" .. u.cost
 		b.Font = Style.FONT
 		b.LayoutOrder = i
 		-- unit palette: neutral charcoal, rarity-colored border only
@@ -85,6 +97,7 @@ function Hotbar.init()
 	Hotbar.bar = bar
 	rebuild()
 	player:GetAttributeChangedSignal("Loadout"):Connect(rebuild)
+	player:GetAttributeChangedSignal("LoadoutLevels"):Connect(rebuild) -- account level text
 	task.spawn(function()
 		while true do
 			if bar.Visible then

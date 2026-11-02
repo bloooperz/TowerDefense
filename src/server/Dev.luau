@@ -1,7 +1,8 @@
 -- Studio-only dev menu backend. Does NOTHING outside Studio: the remotes are not created
 -- (Net studioOnly) and every handler re-checks IsStudio. Cheat state is in memory only and
 -- never written to PlayerData/DataStore (attributes like Rerolls are display-only; saves use
--- the data table).
+-- the data table). EXCEPTION: the leveling test buttons (DevGrantUnitXp / DevGrantPlayerXp /
+-- DevGiveItem / DevGiveUnit) intentionally write real progression so save/rejoin can be tested.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local RS = game:GetService("ReplicatedStorage")
@@ -15,6 +16,8 @@ local Cash = require(Shared.Cash)
 local Match = require(script.Parent.Match)
 local Towers = require(script.Parent.Towers)
 local World = require(script.Parent.World)
+local PlayerData = require(script.Parent.Services.PlayerData)
+local Items = require(Shared.Items)
 
 local log = Log.new("Dev")
 local Dev = {}
@@ -168,6 +171,35 @@ function Dev.init()
 		return Match.devSkipWave()
 	end))
 	Net.on("DevReset", guard(resetAll))
+	Net.on("DevGrantUnitXp", guard(function(plr, xp)
+		if xp <= 0 or xp > 1e7 then
+			return "XP must be 1..10,000,000"
+		end
+		PlayerData.devGrantUnitXp(plr, math.floor(xp))
+		Net.fire("Notify", plr, ("+%d XP to equipped units"):format(xp), "info")
+	end))
+	Net.on("DevGrantPlayerXp", guard(function(plr, xp)
+		if xp <= 0 or xp > 1e7 then
+			return "XP must be 1..10,000,000"
+		end
+		PlayerData.devGrantPlayerXp(plr, math.floor(xp))
+		Net.fire("Notify", plr, ("+%d player XP"):format(xp), "info")
+	end))
+	Net.on("DevGiveItem", guard(function(plr, itemId, n)
+		if not Items.get(itemId) then
+			return "Unknown item " .. itemId
+		end
+		if n < 1 or n > 999 then
+			return "Count must be 1..999"
+		end
+		return PlayerData.devGiveItem(plr, itemId, math.floor(n))
+	end))
+	Net.on("DevGiveUnit", guard(function(plr, unitId)
+		if not Units.get(unitId) then
+			return "Unknown unit " .. unitId
+		end
+		return PlayerData.devGiveUnit(plr, unitId)
+	end))
 	local function watch(plr)
 		plr:GetAttributeChangedSignal("Cash"):Connect(function()
 			holdCash(plr)

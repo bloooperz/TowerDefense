@@ -7,7 +7,7 @@ local TweenService = game:GetService("TweenService")
 local Shared = RS:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Units = require(Shared.Units)
-local Rewards = require(Shared.Rewards)
+local PlayerLevel = require(Shared.PlayerLevel)
 local Net = require(Shared.Net)
 local Log = require(Shared.Log)
 local UI = script.Parent.Parent.UI
@@ -164,9 +164,9 @@ local function levelBar(parent)
 	Theme.button(levelFill, Theme.World.YELLOW)
 	levelText = Theme.label({ Size = UDim2.new(1, 0, 1, -4), Position = UDim2.fromOffset(0, 2), ZIndex = 3 }, bg)
 	local function upd()
-		local l, into, need = Rewards.levelProgress(player:GetAttribute("Xp") or 0)
-		levelFill.Size = UDim2.fromScale(math.clamp(into / need, 0, 1), 1)
-		levelText.Text = ("Level %d [%d/%d]"):format(l, into, need)
+		local l, into, need = PlayerLevel.progress(player:GetAttribute("Xp") or 0)
+		levelFill.Size = UDim2.fromScale(need > 0 and math.clamp(into / need, 0, 1) or 1, 1)
+		levelText.Text = need > 0 and ("Level %d [%d/%d]"):format(l, into, need) or ("Level %d [MAX]"):format(l)
 	end
 	player:GetAttributeChangedSignal("Xp"):Connect(upd)
 	upd()
@@ -205,6 +205,7 @@ function LobbyUI.init()
 		end
 	end
 	watchCircles()
+	require(script.Parent.Progression).build(panels)
 
 	sidePanel(LEFT, 0, 0)
 	sidePanel(RIGHT, 1, 1)
@@ -217,8 +218,19 @@ function LobbyUI.init()
 	Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, hotbar)
 	levelBar(bottom)
 	rebuildHotbar()
-	player:GetAttributeChangedSignal("Loadout"):Connect(rebuildHotbar)
-	player:GetAttributeChangedSignal("LoadoutLevels"):Connect(rebuildHotbar)
+	-- Loadout and LoadoutLevels are set together; one deferred rebuild per change burst
+	local pending = false
+	local function queue()
+		if not pending then
+			pending = true
+			task.defer(function()
+				pending = false
+				rebuildHotbar()
+			end)
+		end
+	end
+	player:GetAttributeChangedSignal("Loadout"):Connect(queue)
+	player:GetAttributeChangedSignal("LoadoutLevels"):Connect(queue)
 
 	UIS.InputBegan:Connect(function(input, gpe)
 		if gpe or not screen.Enabled then

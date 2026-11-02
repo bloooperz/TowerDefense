@@ -4,7 +4,7 @@
 -- and update DataSchema.default. reconcile() fills any missing fields from defaults.
 local DataSchema = {}
 
-DataSchema.VERSION = 3
+DataSchema.VERSION = 4
 
 local function deepCopy(t)
 	if type(t) ~= "table" then
@@ -22,6 +22,9 @@ function DataSchema.newUnit(uid: string, unitId: string)
 	return { uid = uid, unitId = unitId, level = 1, xp = 0, trait = nil }
 end
 
+-- Unit instance (v4): { uid, unitId, level = 1..80, xp = progress INTO level (shared/UnitLevel), trait? }
+-- Player: xp = lifetime total; level mirrors PlayerLevel.levelForXp(xp) (kept in sync by PlayerData).
+
 -- genUid: () -> string. starter: list of unit ids.
 function DataSchema.default(genUid, starter: { string })
 	local d = {
@@ -36,6 +39,8 @@ function DataSchema.default(genUid, starter: { string })
 		stats = { matches = 0, wins = 0, kills = 0, damage = 0, wavesCleared = 0, bestWave = 0 },
 		clears = {}, -- ["Map:Mode"] = true (first-clear tracking)
 		settings = {}, -- v3: validated by shared/Settings.sanitize (has its own .version)
+		items = {}, -- v4: [itemId] = count (shared/Items)
+		milestones = {}, -- v4: ["<level>"] = true (shared/Milestones, claimed)
 	}
 	for _, id in ipairs(starter) do
 		local uid = genUid()
@@ -66,6 +71,31 @@ DataSchema.MIGRATIONS = {
 	[2] = function(d)
 		if type(d.settings) ~= "table" then
 			d.settings = {}
+		end
+	end,
+	-- v3 -> v4: unit leveling rework. Old units stored LIFETIME xp at 150 xp/level (cap 50);
+	-- now xp is progress into the current level (cap 80). Keep the old level, carry the
+	-- remainder (PlayerData then runs UnitLevel.normalize for any overflow). Add items/milestones.
+	[3] = function(d)
+		for uid, u in pairs(d.units or {}) do
+			if type(u) ~= "table" or type(u.unitId) ~= "string" then
+				d.units[uid] = nil
+				continue
+			end
+			u.uid = uid
+			local oldXp = math.max(tonumber(u.xp) or 0, 0)
+			local lv = math.max(math.floor(tonumber(u.level) or 1), math.min(math.floor(oldXp / 150) + 1, 50))
+			u.level = math.clamp(lv, 1, 80)
+			u.xp = math.max(math.floor(oldXp - (lv - 1) * 150), 0)
+			if u.xp > 0 and oldXp < (lv - 1) * 150 then
+				u.xp = 0
+			end
+		end
+		if type(d.items) ~= "table" then
+			d.items = {}
+		end
+		if type(d.milestones) ~= "table" then
+			d.milestones = {}
 		end
 	end,
 }
@@ -101,7 +131,7 @@ function DataSchema.migrate(d, genUid, starter: { string }, maxLoadout: number?)
 	-- drop loadout entries pointing at missing units; trim
 	local cleaned = {}
 	for _, uid in ipairs(d.loadout) do
-		if d.units[uid] and #cleaned < (maxLoadout or 6) then
+		if d.units[uid] and #cleaned < (maxLoadout or 6) and not table.find(cleaned, uid) then
 			table.insert(cleaned, uid)
 		end
 	end

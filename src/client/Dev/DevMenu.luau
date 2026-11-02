@@ -11,6 +11,7 @@ local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
 local Traits = require(Shared.Traits)
 local Theme = require(script.Parent.Parent.UI.Theme)
+local Items = require(RS:WaitForChild("Shared"):WaitForChild("Items"))
 local Toast = require(script.Parent.Parent.Toast)
 local Placement = require(script.Parent.Parent.Placement)
 
@@ -93,7 +94,7 @@ local function build()
 	local corner = btn("DEV", Color3.fromRGB(200, 40, 60), gui)
 	corner.AnchorPoint, corner.Position, corner.Size = Vector2.new(1, 1), UDim2.new(1, -8, 1, -8), UDim2.fromOffset(52, 28)
 
-	local frame = Theme.make("Frame", { Size = UDim2.fromOffset(300, 470), Position = UDim2.new(1, -320, 0, 80), BackgroundColor3 = BG, Visible = false }, gui)
+	local frame = Theme.make("Frame", { Size = UDim2.fromOffset(300, 560), Position = UDim2.new(1, -320, 0, 80), BackgroundColor3 = BG, Visible = false }, gui)
 	Theme.panel(frame, Theme.World.RED)
 	local title = Theme.make("TextLabel", { Text = "  DEV MENU (Studio)  [F2]", Font = Enum.Font.GothamBlack, TextSize = 15, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = Color3.fromRGB(200, 40, 60), Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, Active = true }, frame)
 	Theme.round(title, 8)
@@ -163,6 +164,27 @@ local function build()
 	end)
 	btn("Reset all", Color3.fromRGB(170, 50, 50), body, 21).Activated:Connect(function()
 		Net.send("DevReset")
+	end)
+
+	-- LEVELING (writes real, saved progression so rejoin/persistence can be tested)
+	header("LEVELING (saved to your profile)", 30)
+	for i, n in ipairs({ 1000, 10000, 100000 }) do
+		btn(("+%d unit XP (equipped)"):format(n), Theme.World.ORANGE, body, 30 + i).Activated:Connect(function()
+			Net.send("DevGrantUnitXp", n)
+		end)
+	end
+	for i, n in ipairs({ 500, 5000 }) do
+		btn(("+%d player XP"):format(n), Theme.World.BLUE, body, 34 + i).Activated:Connect(function()
+			Net.send("DevGrantPlayerXp", n)
+		end)
+	end
+	for i, it in ipairs(Items.LIST) do
+		btn(("+5 %s"):format(it.name), Theme.World.GREEN, body, 37 + i).Activated:Connect(function()
+			Net.send("DevGiveItem", it.id, 5)
+		end)
+	end
+	btn("+1 copy of selected sandbox unit (fuse test)", ROW, body, 45).Activated:Connect(function()
+		Net.send("DevGiveUnit", getUnit().id)
 	end)
 
 	local function toggle()

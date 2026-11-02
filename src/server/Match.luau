@@ -12,6 +12,7 @@ local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
 local Waves = require(Shared.Waves)
 local Rewards = require(Shared.Rewards)
+local UnitLevel = require(Shared.UnitLevel)
 local World = require(script.Parent.World)
 local EnemySim = require(script.Parent.Enemies)
 local Combat = require(script.Parent.Combat)
@@ -256,10 +257,11 @@ local function finish(won)
 			firstClear = d and not d.clears[clearKey],
 		})
 		local st = Combat.stats[plr] or { kills = 0, damage = 0 }
-		PlayerData.grant(plr, {
+		local unitXp = UnitLevel.stageXp({ wavesCleared = wavesCleared, won = won, rewardScale = mode.rewardScale })
+		local unitReport = PlayerData.grant(plr, {
 			gems = r.gems,
 			xp = r.xp,
-			unitXp = r.unitXp,
+			unitXp = unitXp,
 			stats = {
 				matches = 1,
 				wins = won and 1 or 0,
@@ -276,6 +278,9 @@ local function finish(won)
 			time = math.floor(elapsed),
 			gems = r.gems,
 			xp = r.xp,
+			unitXp = unitXp,
+			units = unitReport, -- { [uid] = { unitId, gained, levels, level } }
+			level = plr:GetAttribute("Level"),
 			kills = st.kills,
 			damage = math.floor(st.damage),
 			mapName = map.name,
@@ -605,7 +610,7 @@ function Match.init(infoFolder)
 			return why .. (" [%s @ %d,%d]"):format(unitId, pos.X, pos.Z)
 		end
 		cash.Value -= u.cost
-		Towers.place(unitId, pos, plr)
+		Towers.place(unitId, pos, plr, nil, PlayerData.unitLevelFor(plr, unitId))
 		return nil
 	end)
 
@@ -633,6 +638,37 @@ function Match.init(infoFolder)
 			return "Unit not found"
 		end
 		cash.Value += Towers.sell(t)
+		return nil
+	end)
+
+	Net.on("UseItem", function(plr, uid, itemId, count)
+		local why, u, before = PlayerData.feedUnit(plr, uid, itemId, count)
+		if why then
+			return why
+		end
+		Net.fire("Notify", plr, ("%s Lv %d -> %d"):format(u.unitId, before, u.level), "info")
+		return nil
+	end)
+
+	Net.on("FuseUnits", function(plr, targetUid, csv)
+		local feed = {}
+		for uid in string.gmatch(csv, "[^,]+") do
+			table.insert(feed, uid)
+		end
+		local why, u, before = PlayerData.fuseUnits(plr, targetUid, feed)
+		if why then
+			return why
+		end
+		Net.fire("Notify", plr, ("Fused %d into %s: Lv %d -> %d"):format(#feed, u.unitId, before, u.level), "info")
+		return nil
+	end)
+
+	Net.on("ClaimMilestone", function(plr, level)
+		local why = PlayerData.claimMilestone(plr, level)
+		if why then
+			return why
+		end
+		Net.fire("Notify", plr, ("Milestone Lv %d claimed!"):format(level), "info")
 		return nil
 	end)
 

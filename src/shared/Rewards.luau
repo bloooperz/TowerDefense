@@ -24,10 +24,11 @@ function Rewards.compute(r)
 	if (r.engaged ~= false) and gems < 1 then
 		gems = 1
 	end
-	return { gems = gems, xp = xp, unitXp = xp }
+	return { gems = gems, xp = xp } -- unit XP: shared/UnitLevel.stageXp
 end
 
--- Player level from total XP (quadratic curve).
+-- Player level from total XP (quadratic curve). Same curve as shared/PlayerLevel (which adds the
+-- level cap + unlocks); kept for existing callers/tests.
 function Rewards.levelForXp(xp: number): number
 	return math.floor(math.sqrt(math.max(xp, 0) / 100)) + 1
 end
@@ -44,9 +45,5 @@ function Rewards.levelProgress(xp: number): (number, number, number)
 	return l, xp - base, Rewards.xpForLevel(l + 1) - base
 end
 
--- Unit instance level from its XP.
-function Rewards.unitLevelForXp(xp: number): number
-	return math.min(math.floor(math.max(xp, 0) / 150) + 1, 50)
-end
 
 return Rewards

@@ -23,6 +23,9 @@ Net.DEFS = {
 	LeaveMatch = { dir = "c2s", args = {}, rate = 2 }, -- settings: leave any time (towers removed)
 	RequestRestart = { dir = "c2s", args = {}, rate = 2 }, -- settings: solo = immediate, multi = vote
 	SaveSettings = { dir = "c2s", args = { "string" }, rate = 2, maxLen = 4000 }, -- JSON, server-validated
+	UseItem = { dir = "c2s", args = { "string", "string", "number" }, rate = 4 }, -- (unitUid, itemId, count) XP food
+	FuseUnits = { dir = "c2s", args = { "string", "string" }, rate = 2, maxLen = 2000 }, -- (targetUid, "uid,uid,...")
+	ClaimMilestone = { dir = "c2s", args = { "number" }, rate = 3 },
 	DamageNumber = { dir = "s2c", unreliable = true }, -- (pos, amount, crit) to the attacking player
 	MatchState = { dir = "s2c" },
 	OpenMapSelect = { dir = "s2c" },
@@ -34,6 +37,10 @@ Net.DEFS = {
 	DevToggle = { dir = "c2s", args = { "string", "boolean" }, rate = 6, studioOnly = true },
 	DevSkipWave = { dir = "c2s", args = {}, rate = 2, studioOnly = true },
 	DevReset = { dir = "c2s", args = {}, rate = 2, studioOnly = true },
+	DevGrantUnitXp = { dir = "c2s", args = { "number" }, rate = 4, studioOnly = true }, -- to equipped units
+	DevGrantPlayerXp = { dir = "c2s", args = { "number" }, rate = 4, studioOnly = true },
+	DevGiveItem = { dir = "c2s", args = { "string", "number" }, rate = 4, studioOnly = true },
+	DevGiveUnit = { dir = "c2s", args = { "string" }, rate = 4, studioOnly = true }, -- duplicate for fuse tests
 	Beam = { dir = "s2c", unreliable = true }, -- (from, to, color) drawn client-side -- (text, kind) toast; kind = "error" | "info"
 }
 
