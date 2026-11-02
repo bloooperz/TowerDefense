@@ -29,4 +29,23 @@ function Traits.apply(stats, traitId)
 	return out
 end
 
+-- Single stat resolver for overridden (sandbox) units, used by server Towers AND client UnitPanel.
+-- base = UnitStats.at(unit, level). overrides = { damage?, range?, rate?, trait? }; values <= 0 or nil
+-- fall back to the level's stat. Trait multiplies the result. ability table is kept as-is.
+function Traits.resolve(base, overrides)
+	if not overrides then
+		return base
+	end
+	local out = table.clone(base)
+	for _, k in ipairs({ "damage", "range", "rate" }) do
+		local v = overrides[k]
+		if type(v) == "number" and v > 0 then
+			out[k] = v
+		end
+	end
+	local r = Traits.apply(out, overrides.trait or "None")
+	r.ability = base.ability
+	return r
+end
+
 return Traits

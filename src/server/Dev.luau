@@ -6,7 +6,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local RS = game:GetService("ReplicatedStorage")
 local Shared = RS.Shared
-local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Log = require(Shared.Log)
 local Units = require(Shared.Units)
@@ -15,6 +14,7 @@ local Traits = require(Shared.Traits)
 local Cash = require(Shared.Cash)
 local Match = require(script.Parent.Match)
 local Towers = require(script.Parent.Towers)
+local World = require(script.Parent.World)
 
 local log = Log.new("Dev")
 local Dev = {}
@@ -77,10 +77,26 @@ local function setFlag(name, on)
 	return nil
 end
 
--- Sandbox: places the unit directly in the CURRENT match at the player's feet (no inventory
--- yet; DataSchema units would persist). Free, ignores placement rules / caps. Stat inputs <= 0
--- mean "use the level's normal stat". Trait multipliers apply on top.
-local function sandbox(plr, unitId, traitId, damage, range, rate, level)
+-- Sandbox: the client picks a spot with the normal placement preview (cost/caps skipped) and
+-- sends it; the server snaps it to the ground with a raycast and places the unit in the
+-- CURRENT match (no in-match inventory exists; DataSchema units would persist). Custom stats are
+-- stored as tower.overrides and resolved by Towers.resolveStats (survive ticks and upgrades).
+-- Stat inputs <= 0 mean "use the level's normal stat".
+local function groundAt(pos, size)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local ignore = { World.runtime }
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p.Character then
+			table.insert(ignore, p.Character)
+		end
+	end
+	params.FilterDescendantsInstances = ignore
+	local hit = workspace:Raycast(Vector3.new(pos.X, pos.Y + 50, pos.Z), Vector3.new(0, -200, 0), params)
+	return hit and Vector3.new(math.round(pos.X), hit.Position.Y + size / 2, math.round(pos.Z))
+end
+
+local function sandbox(plr, unitId, traitId, damage, range, rate, level, pos)
 	local u = Units.get(unitId)
 	if not u then
 		return "Unknown unit: " .. unitId
@@ -91,30 +107,23 @@ local function sandbox(plr, unitId, traitId, damage, range, rate, level)
 	if not Match.isInMatch(plr) then
 		return "Join a match first (sandbox places units in the match)"
 	end
-	local hrp = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-	if not hrp then
-		return "No character"
+	if damage < 0 or range < 0 or rate < 0 then
+		return "Stats must be >= 0 (0 = default)"
+	end
+	local at = groundAt(pos, u.size)
+	if not at then
+		return ("Sandbox: no ground under %d,%d"):format(pos.X, pos.Z)
 	end
 	level = math.clamp(math.floor(level), 1, UnitStats.maxLevel(u))
-	local p = hrp.Position + hrp.CFrame.LookVector * 4
-	local pos = Vector3.new(math.round(p.X), Config.MAP_ORIGIN.Y + Config.GROUND_TOP + u.size / 2, math.round(p.Z))
-	local t = Towers.place(unitId, pos, plr)
-	local st = UnitStats.at(u, level)
-	st.damage = damage > 0 and damage or st.damage
-	st.range = range > 0 and range or st.range
-	st.rate = rate > 0 and rate or st.rate
-	t.stats = Traits.apply(st, traitId)
-	t.stats.ability = st.ability
-	if t.ability then
-		t.ability.cfg = t.stats.ability
-	end
-	t.level, t.spent, t.sandbox = level, 0, true
-	t.part:SetAttribute("Level", level)
+	local t = Towers.place(unitId, at, plr, {
+		level = level,
+		overrides = { damage = damage, range = range, rate = rate, trait = traitId },
+	})
+	t.spent, t.sandbox = 0, true
 	t.part:SetAttribute("Spent", 0)
-	t.part:SetAttribute("Trait", traitId)
 	t.part:SetAttribute("Sandbox", true)
 	t.levelLabel.Text = ("Lv %d%s"):format(level, traitId ~= "None" and (" " .. traitId) or "")
-	log.info(plr.Name, "sandbox", unitId, traitId, "lv", level, "dmg", t.stats.damage, "rng", t.stats.range, "rate", t.stats.rate)
+	log.info(plr.Name, "sandbox", unitId, traitId, "lv", level, "at", tostring(at), "dmg", t.stats.damage, "rng", t.stats.range, "rate", t.stats.rate)
 	return nil
 end
 

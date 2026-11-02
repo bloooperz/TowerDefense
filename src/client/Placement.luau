@@ -17,16 +17,17 @@ local mouse = player:GetMouse()
 local ghost, ring, unit, topper
 local cashValue, unitId
 local tip, warn, flashUntil = nil, nil, 0
+local sandboxCb = nil -- dev sandbox placement: skips cost/caps, calls back with the position
 
 -- Why the current spot can't be used, or nil if it can.
 function Placement.reason()
 	if not ghost then
 		return nil
 	end
-	if MyUnits.count(unitId) >= UnitStats.maxPlaced(unit) then
+	if not sandboxCb and MyUnits.count(unitId) >= UnitStats.maxPlaced(unit) then
 		return "Limit reached!"
 	end
-	if cashValue.Value < unit.cost then
+	if not sandboxCb and cashValue.Value < unit.cost then
 		return "Not enough money!"
 	end
 	local pos = ghost.Position
@@ -92,6 +93,7 @@ function Placement.init(cash)
 end
 
 function Placement.clear()
+	sandboxCb = nil
 	if ghost then
 		ghost:Destroy()
 		ghost = nil
@@ -125,6 +127,28 @@ function Placement.start(u, id)
 		topper.Parent = ghost
 	end
 	mouse.TargetFilter = ghost
+end
+
+-- Dev sandbox: same preview, but free/uncapped; LMB calls cb(pos) (Main routes the click).
+function Placement.startSandbox(u, range, cb)
+	Placement.start(u, u.id)
+	sandboxCb = cb
+	if range and range > 0 then
+		ring.Size = Vector3.new(0.2, range * 2, range * 2)
+	end
+end
+function Placement.isSandbox()
+	return sandboxCb ~= nil
+end
+function Placement.commitSandbox()
+	local why = Placement.reason()
+	if why then
+		Placement.flash(why)
+		return
+	end
+	local cb, pos = sandboxCb, ghost.Position
+	Placement.clear()
+	cb(pos)
 end
 
 function Placement.position()

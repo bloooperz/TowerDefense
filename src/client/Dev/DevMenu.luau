@@ -12,6 +12,7 @@ local UnitStats = require(Shared.UnitStats)
 local Traits = require(Shared.Traits)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local Toast = require(script.Parent.Parent.Toast)
+local Placement = require(script.Parent.Parent.Placement)
 
 local log = Log.new("DevMenu")
 local DevMenu = {}
@@ -125,7 +126,17 @@ local function build()
 	end
 	btn("Spawn unit", Color3.fromRGB(50, 140, 80), body, 8).Activated:Connect(function()
 		local ok, err = pcall(function()
-			Net.send("DevSandbox", getUnit().id, getTrait().id, num(dmg, 0), num(rng, 0), num(rate, 0), num(lvl, 1))
+			-- read the boxes NOW (live .Text), then pick the spot with the placement preview
+			local u, tr = getUnit(), getTrait()
+			local d, r, a, l = num(dmg, 0), num(rng, 0), num(rate, 0), num(lvl, 1)
+			if d < 0 or r < 0 or a < 0 then
+				error("stats must be >= 0 (blank/0 = default)", 0)
+			end
+			log.info("sandbox", u.id, tr.id, "dmg", d, "rng", r, "rate", a, "lv", l, "- click to place, Q cancels")
+			Placement.startSandbox(u, r, function(pos)
+				Net.send("DevSandbox", u.id, tr.id, d, r, a, l, pos)
+			end)
+			Toast.show("Click to place " .. (u.name or u.id) .. " (Q/RMB cancels)", "info")
 		end)
 		if not ok then
 			log.warn("sandbox input:", err)

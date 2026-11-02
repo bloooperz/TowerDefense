@@ -6,6 +6,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
+local Traits = require(Shared.Traits)
 
 local UnitPanel = {}
 local player = Players.LocalPlayer
@@ -73,8 +74,13 @@ local function refresh()
 	end
 	local level = current:GetAttribute("Level") or 1
 	local maxL = UnitStats.maxLevel(u)
-	local st = UnitStats.at(u, level)
-	local nx = level < maxL and UnitStats.at(u, level + 1) or nil
+	-- sandbox units carry overrides (Ov* attrs); same shared resolver as the server
+	local ov = current:GetAttribute("Trait") and {
+		damage = current:GetAttribute("OvDamage"), range = current:GetAttribute("OvRange"),
+		rate = current:GetAttribute("OvRate"), trait = current:GetAttribute("Trait"),
+	} or nil
+	local st = Traits.resolve(UnitStats.at(u, level), ov)
+	local nx = level < maxL and Traits.resolve(UnitStats.at(u, level + 1), ov) or nil
 
 	gui.name.Text = u.name .. (u.unique and "  ★" or "")
 	gui.level.Text = "Lv " .. level .. "/" .. maxL

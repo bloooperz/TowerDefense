@@ -6,6 +6,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
+local Traits = require(Shared.Traits)
 local World = require(script.Parent.World)
 local Enemies = require(script.Parent.Enemies)
 local Api = require(script.Parent.AbilityApi)
@@ -32,7 +33,22 @@ function Towers.broadcast(name, ...)
 	end
 end
 
-function Towers.place(unitId, pos, owner)
+-- The ONE place tower stats are resolved: level table, then per-tower overrides (sandbox).
+-- Called on place and on every upgrade, so overrides persist. Ticks only read t.stats.
+local function resolveStats(t)
+	t.stats = Traits.resolve(UnitStats.at(t.unit, t.level), t.overrides)
+	if t.ability then
+		t.ability.cfg = t.stats.ability
+	end
+	local p = t.part
+	p:SetAttribute("StatDamage", t.stats.damage)
+	p:SetAttribute("StatRange", t.stats.range)
+	p:SetAttribute("StatRate", t.stats.rate)
+end
+Towers.resolveStats = resolveStats
+
+-- opts (optional, dev sandbox): { level = n, overrides = { damage, range, rate, trait } }
+function Towers.place(unitId, pos, owner, opts)
 	local u = Units.get(unitId)
 	local p = World.part({
 		Name = u.name,
@@ -60,13 +76,25 @@ function Towers.place(unitId, pos, owner)
 	p:SetAttribute("Level", 1)
 	p:SetAttribute("Spent", t.spent)
 	p:SetAttribute("Targeting", "First")
+	if opts then
+		t.level = opts.level or 1
+		t.overrides = opts.overrides
+		p:SetAttribute("Level", t.level)
+		if t.overrides then
+			p:SetAttribute("OvDamage", t.overrides.damage or 0)
+			p:SetAttribute("OvRange", t.overrides.range or 0)
+			p:SetAttribute("OvRate", t.overrides.rate or 0)
+			p:SetAttribute("Trait", t.overrides.trait or "None")
+		end
+	end
+	resolveStats(t)
 
 	local bb = Instance.new("BillboardGui")
 	bb.Name, bb.Size, bb.StudsOffsetWorldSpace = "LevelTag", UDim2.fromOffset(60, 22), Vector3.new(0, u.size / 2 + 1.5, 0)
 	bb.MaxDistance = 120
 	local lbl = Instance.new("TextLabel")
 	lbl.Size, lbl.BackgroundTransparency, lbl.TextScaled = UDim2.fromScale(1, 1), 1, true
-	lbl.TextColor3, lbl.Font, lbl.Text = Color3.new(1, 1, 1), Enum.Font.GothamBold, "Lv 1"
+	lbl.TextColor3, lbl.Font, lbl.Text = Color3.new(1, 1, 1), Enum.Font.GothamBold, "Lv " .. t.level
 	lbl.TextStrokeTransparency = 0.3
 	lbl.Parent = bb
 	bb.Parent = p
@@ -141,11 +169,8 @@ end
 function Towers.upgrade(t)
 	t.spent += Towers.upgradeCost(t)
 	t.level += 1
-	t.stats = UnitStats.at(t.unit, t.level)
-	if t.ability then
-		t.ability.cfg = t.stats.ability
-	end
 	t.part:SetAttribute("Level", t.level)
+	resolveStats(t) -- keeps sandbox overrides
 	t.part:SetAttribute("Spent", t.spent)
 	t.levelLabel.Text = "Lv " .. t.level
 	hook(t, "onUpgrade", t.level)

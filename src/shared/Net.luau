@@ -26,7 +26,7 @@ Net.DEFS = {
 	Notify = { dir = "s2c" },
 	EnemyDied = { dir = "s2c" }, -- (enemyId) client hides instantly, before Destroy replicates
 	-- Studio-only dev menu (server/Dev.luau). studioOnly remotes are NOT created outside Studio.
-	DevSandbox = { dir = "c2s", args = { "string", "string", "number", "number", "number", "number" }, rate = 4, studioOnly = true },
+	DevSandbox = { dir = "c2s", args = { "string", "string", "number", "number", "number", "number", "Vector3" }, rate = 4, studioOnly = true },
 	DevToggle = { dir = "c2s", args = { "string", "boolean" }, rate = 6, studioOnly = true },
 	DevSkipWave = { dir = "c2s", args = {}, rate = 2, studioOnly = true },
 	DevReset = { dir = "c2s", args = {}, rate = 2, studioOnly = true },

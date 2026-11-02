@@ -122,6 +122,8 @@ UIS.InputBegan:Connect(function(input, processed)
 		select(keys[input.KeyCode])
 	elseif input.KeyCode == Enum.KeyCode.Q or input.UserInputType == Enum.UserInputType.MouseButton2 then
 		clear()
+	elseif input.UserInputType == Enum.UserInputType.MouseButton1 and Placement.isSandbox() then
+		Log.try("Client", "sandbox place", Placement.commitSandbox)
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1 and selected then
 		local why = Placement.reason()
 		if why then
