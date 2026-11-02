@@ -79,7 +79,8 @@ Hud.onUnitClicked = function(p)
 	UnitPanel.open(p)
 end
 
-local cashValue = Players.LocalPlayer:WaitForChild("leaderstats"):WaitForChild("Cash")
+-- Attribute-backed handle: never yields, works in lobby (0) and match.
+local cashValue = require(RS.Shared.Cash).of(Players.LocalPlayer)
 Log.try("Client", "Placement.init", Placement.init, cashValue)
 Log.try("Client", "Hud.init", Hud.init, cashValue)
 Log.try("Client", "UnitPanel.init", UnitPanel.init, cashValue, sender("UpgradeUnit"), sender("SellUnit"), sender("SetTargeting"))

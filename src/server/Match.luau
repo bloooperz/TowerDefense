@@ -19,6 +19,7 @@ local Towers = require(script.Parent.Towers)
 local PlayerData = require(script.Parent.Services.PlayerData)
 local Log = require(Shared.Log)
 local PlacementRules = require(Shared.PlacementRules)
+local Cash = require(Shared.Cash)
 local log = Log.new("Match")
 
 local Match = {}
@@ -59,8 +60,7 @@ local function sync()
 end
 
 local function getCash(plr)
-	local ls = plr:FindFirstChild("leaderstats")
-	return ls and ls:FindFirstChild("Cash")
+	return Cash.of(plr) -- attribute-backed handle; leaderstats.Cash is a match-only mirror
 end
 
 local function payMatch(n)
@@ -123,10 +123,8 @@ local function joinMatch(plr)
 	end
 	inMatch[plr] = true
 	plr:SetAttribute("Voted", false)
-	local c = getCash(plr)
-	if c then
-		c.Value = Config.START_CASH
-	end
+	getCash(plr).Value = Config.START_CASH
+	Cash.setVisible(plr, true)
 	moveTo(plr, Maps.spawnPoint(map))
 	Net.fire("MatchState", plr, state)
 	log.info(plr.Name, "joined", map.id, mode.id)
@@ -142,6 +140,8 @@ local function leaveMatch(plr)
 	votes[plr] = nil
 	plr:SetAttribute("Voted", false)
 	Towers.removeOwner(plr)
+	Cash.setVisible(plr, false)
+	getCash(plr).Value = 0
 	moveTo(plr, Config.LOBBY_SPAWN)
 	Net.fire("MatchState", plr, "lobby")
 	sync()
@@ -152,6 +152,8 @@ local function resetMatch()
 	for plr in pairs(inMatch) do
 		moveTo(plr, Config.LOBBY_SPAWN)
 		plr:SetAttribute("Voted", false)
+		Cash.setVisible(plr, false)
+		getCash(plr).Value = 0
 		Net.fire("MatchState", plr, "lobby")
 	end
 	table.clear(inMatch)
@@ -347,8 +349,13 @@ function Match.init(infoFolder)
 		if plr:FindFirstChild("leaderstats") then return end
 		local ls = Instance.new("Folder")
 		ls.Name = "leaderstats"
-		local c = Instance.new("IntValue")
-		c.Name, c.Value, c.Parent = "Cash", Config.START_CASH, ls
+		-- lobby column: Level (mirrors the Level attribute). Cash is added only in a match.
+		local lv = Instance.new("IntValue")
+		lv.Name, lv.Value, lv.Parent = "Level", plr:GetAttribute("Level") or 1, ls
+		plr:GetAttributeChangedSignal("Level"):Connect(function()
+			lv.Value = plr:GetAttribute("Level") or 1
+		end)
+		plr:SetAttribute("Cash", 0)
 		ls.Parent = plr
 		plr.CharacterAdded:Connect(function(char)
 			if inMatch[plr] and map then

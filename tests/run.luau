@@ -25,7 +25,7 @@ local function near(a, b, msg)
 end
 
 local ctx = { test = test, eq = eq, near = near, V = V }
-for _, spec in ipairs({ "path", "damage", "status", "waves", "rewards", "dataschema", "unitstats", "placement", "enemylife" }) do
+for _, spec in ipairs({ "path", "damage", "status", "waves", "rewards", "dataschema", "unitstats", "placement", "enemylife", "cash" }) do
 	print(spec)
 	require("./specs/" .. spec)(ctx)
 end

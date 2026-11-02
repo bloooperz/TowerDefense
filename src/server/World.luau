@@ -16,11 +16,25 @@ local function part(props, parent)
 end
 World.part = part
 
-local function billboard(adornee, text, size)
+-- Floating label. Root cause of the "sign in the ground" bug: with AlwaysOnTop=false a
+-- PIXEL-sized billboard becomes huge in world space up close and clips into the floor
+-- (and the portal cylinder is rotated, so local offsets are unreliable). Fix: an invisible
+-- anchored anchor part at world pos + height, and a STUD-sized (scale) billboard.
+local function billboard(adornee, text, studs, height)
+	studs = studs or Vector2.new(12, 3)
+	local anchor = Instance.new("Part")
+	anchor.Name = "LabelAnchor"
+	anchor.Size = Vector3.one * 0.2
+	anchor.Transparency = 1
+	anchor.Anchored, anchor.CanCollide, anchor.CanQuery, anchor.CanTouch = true, false, false, false
+	anchor.CFrame = CFrame.new(adornee.Position + Vector3.new(0, height or 6, 0))
+	anchor.Parent = adornee
 	local g = Instance.new("BillboardGui")
-	g.Size, g.StudsOffsetWorldSpace, g.AlwaysOnTop = size or UDim2.fromOffset(250, 60), Vector3.new(0, 6, 0), false
-	g.MaxDistance = 120 -- not AlwaysOnTop: never draws through walls/UI
-	g.Parent = adornee
+	g.Size = UDim2.fromScale(studs.X, studs.Y) -- scale units = studs
+	g.AlwaysOnTop = false
+	g.LightInfluence = 0
+	g.MaxDistance = 120
+	g.Parent = anchor
 	local l = Instance.new("TextLabel")
 	l.Size, l.BackgroundTransparency, l.TextScaled = UDim2.fromScale(1, 1), 1, true
 	l.TextColor3, l.Text, l.Font = Color3.new(1, 1, 1), text, Enum.Font.FredokaOne
@@ -42,7 +56,7 @@ function World.buildLobby()
 		Material = Enum.Material.Neon,
 		CanCollide = false,
 	}, lobby)
-	World.portalLabel = billboard(World.portal, "Step in to play!")
+	World.portalLabel = billboard(World.portal, "Step in to play!", Vector2.new(12, 3), Config.PORTAL_SIZE / 2 + 2.5) -- above the 14-stud ring, not inside it
 
 	World.runtime = Instance.new("Folder")
 	World.runtime.Name = "Runtime" -- placed units live directly in here
@@ -95,7 +109,7 @@ function World.buildMap(map)
 		Position = endPos + endDir * 6 + Vector3.new(0, 4 - 0.5, 0),
 		Color = Color3.fromRGB(0, 120, 255),
 	}, f)
-	World.baseLabel = billboard(World.base, "", UDim2.fromOffset(120, 28))
+	World.baseLabel = billboard(World.base, "", Vector2.new(7, 1.6), 6) -- base is 8 tall (center +4): label ~2 studs above top
 	local startPos = path:positionAt(0)
 	part({
 		Name = "EnemySpawn",
