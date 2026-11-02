@@ -379,6 +379,26 @@ function Match.init(infoFolder)
 		end
 	end)
 
+	-- Offer pick (idle) / join (waiting); used by the portal and the lobby Play button.
+	local function offer(plr)
+		if state == "idle" then
+			offeredAt[plr] = os.clock()
+			Net.fire("OpenMapSelect", plr, { kind = "pick" })
+		elseif state == "waiting" then
+			offeredAt[plr] = os.clock()
+			Net.fire("OpenMapSelect", plr, { kind = "join", mapName = map.name, modeName = mode.name, players = count(inMatch) })
+		else
+			return "Match in progress - wait for it to end"
+		end
+		return nil
+	end
+	Net.on("RequestPlay", function(plr)
+		if inMatch[plr] then
+			return "You're already in a match"
+		end
+		return offer(plr)
+	end)
+
 	-- Portal (edge-triggered on entering the circle). Nobody is teleported here:
 	--   idle    -> offer the map/mode picker (ChooseMap confirms)
 	--   waiting -> offer a join prompt (JoinMatch confirms)
@@ -395,14 +415,9 @@ function Match.init(infoFolder)
 						inside = Vector2.new(d.X, d.Z).Magnitude <= Config.PORTAL_SIZE / 2 and math.abs(d.Y) < 8
 					end
 					if inside and not insidePortal[plr] then
-						if state == "idle" then
-							offeredAt[plr] = os.clock()
-							Net.fire("OpenMapSelect", plr, { kind = "pick" })
-						elseif state == "waiting" then
-							offeredAt[plr] = os.clock()
-							Net.fire("OpenMapSelect", plr, { kind = "join", mapName = map.name, modeName = mode.name, players = count(inMatch) })
-						else
-							Net.fire("Notify", plr, "Match in progress - wait for it to end", "info")
+						local why = offer(plr)
+						if why then
+							Net.fire("Notify", plr, why, "info")
 						end
 					end
 					insidePortal[plr] = inside or nil

@@ -1,6 +1,7 @@
 -- Unique control/DPS unit. Passive "Divine Dogs" lives in server/Abilities/Mogumo.
 return {
 	name = "Mogumo", order = 4, role = "Control",
+	rarity = "Mythic", damageType = "Magical", element = "Shadow", -- damageType/element: display-only for now
 	cost = 150, size = 3, range = 22, damage = 15, rate = 0.8, maxPlaced = 1,
 	unique = true,
 	topper = Color3.new(0, 0, 0),

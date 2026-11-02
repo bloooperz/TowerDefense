@@ -1,5 +1,6 @@
 return {
 	name = "Sniper", order = 2, role = "DPS",
+	rarity = "Epic", damageType = "Physical", -- damageType/element: display-only for now
 	cost = 120, size = 3, range = 45, damage = 80, rate = 2.0, maxPlaced = 3,
 	armorPen = 0.25,
 	upgrades = {

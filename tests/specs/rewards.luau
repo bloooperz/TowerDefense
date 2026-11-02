@@ -14,4 +14,14 @@ return function(t)
 	t.test("levels", function()
 		t.eq(R.levelForXp(0), 1); t.eq(R.levelForXp(100), 2); t.eq(R.levelForXp(399), 2); t.eq(R.levelForXp(400), 3)
 	end)
+	t.test("level progress", function()
+		t.eq(R.xpForLevel(1), 0); t.eq(R.xpForLevel(3), 400)
+		local l, into, need = R.levelProgress(450)
+		t.eq(l, 3); t.eq(into, 50); t.eq(need, 500)
+		for xp = 0, 3000, 37 do
+			local L, a, n = R.levelProgress(xp)
+			assert(a >= 0 and a < n, "progress in range at " .. xp)
+			t.eq(R.levelForXp(R.xpForLevel(L)), L)
+		end
+	end)
 end

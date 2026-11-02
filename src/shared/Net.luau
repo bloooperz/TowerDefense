@@ -18,6 +18,7 @@ Net.DEFS = {
 	Vote = { dir = "c2s", args = {}, rate = 3 },
 	ChooseMap = { dir = "c2s", args = { "string", "string" }, rate = 2 },
 	JoinMatch = { dir = "c2s", args = {}, rate = 2 },
+	RequestPlay = { dir = "c2s", args = {}, rate = 2 }, -- lobby Play button = stepping into the portal
 	ReturnToLobby = { dir = "c2s", args = {}, rate = 2 },
 	MatchState = { dir = "s2c" },
 	OpenMapSelect = { dir = "s2c" },

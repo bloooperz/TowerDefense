@@ -12,6 +12,7 @@ local PathRenderer = require(script.Parent.PathRenderer)
 local MapSelect = require(script.Parent.MapSelect)
 local Results = require(script.Parent.Results)
 local Toast = require(script.Parent.Toast)
+local LobbyUI = require(script.Parent.Lobby.LobbyUI)
 local Log = require(RS.Shared.Log)
 local log = Log.new("Client")
 log.info("client starting, build", require(RS.Shared.Config).BUILD, "server build", RS:WaitForChild("MatchInfo"):GetAttribute("Build"))
@@ -40,7 +41,7 @@ Net.listen("Notify", function(text, kind)
 	end
 	Toast.show(text, kind)
 end)
-for name, mod in pairs({ Hotbar = Hotbar, PathRenderer = PathRenderer, MapSelect = MapSelect, Results = Results }) do
+for name, mod in pairs({ Hotbar = Hotbar, PathRenderer = PathRenderer, MapSelect = MapSelect, Results = Results, LobbyUI = LobbyUI }) do
 	local ok = Log.try("Client", name .. ".init", mod.init)
 	if not ok then
 		Toast.show(name .. " failed to load (see Output)", "error")

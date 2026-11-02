@@ -37,6 +37,17 @@ To get updates, run `git pull` while `rojo serve` is running. Studio syncs autom
 - **Remote:** add an entry to `Net.DEFS` with argument types and a rate limit.
 - **Saved field:** bump `DataSchema.VERSION`, add a migration and update `default`. Add a test.
 
+## Units
+
+| Unit | Rarity | Damage type | Element |
+|---|---|---|---|
+| Basic | Rare | Physical | none |
+| Sniper | Epic | Physical | none |
+| Rapid | Rare | Physical | Lightning |
+| Mogumo | Mythic | Magical | Shadow |
+
+`rarity`, `damageType` and `element` live in each `shared/Units/*.luau` definition. They are **display-only** for now; damage hooks will come later.
+
 ## Tests
 ```
 lune run tests/run

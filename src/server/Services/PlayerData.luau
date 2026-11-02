@@ -69,14 +69,18 @@ local function replicate(plr, d)
 	plr:SetAttribute("Gems", d.gems)
 	plr:SetAttribute("Level", Rewards.levelForXp(d.xp))
 	plr:SetAttribute("Xp", d.xp)
-	local ids = {}
+	local ids, levels = {}, {}
 	for _, uid in ipairs(d.loadout) do
 		local u = d.units[uid]
 		if u then
 			table.insert(ids, u.unitId)
+			table.insert(levels, tostring(u.level or 1))
 		end
 	end
 	plr:SetAttribute("Loadout", table.concat(ids, ","))
+	plr:SetAttribute("LoadoutLevels", table.concat(levels, ",")) -- parallel to Loadout
+	plr:SetAttribute("Gold", d.gold or 0) -- placeholder until gold/rerolls exist in DataSchema
+	plr:SetAttribute("Rerolls", d.rerolls or 0)
 	for _, fn in ipairs(changedListeners) do
 		task.spawn(Log.try, "PlayerData", "onChanged", fn, plr, d)
 	end

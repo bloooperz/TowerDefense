@@ -30,4 +30,15 @@ Config.TICK_RATE = 0.1 -- seconds between server simulation ticks
 -- Bump on notable pushes; server + client print it so stale Studio scripts are obvious.
 Config.BUILD = "foundation-2"
 
+-- Display metadata (lobby/hotbar cards). Combat ignores these for now.
+Config.RARITY_COLORS = {
+	Common = Color3.fromRGB(170, 170, 180),
+	Rare = Color3.fromRGB(60, 140, 255),
+	Epic = Color3.fromRGB(170, 70, 255),
+	Legendary = Color3.fromRGB(255, 190, 40),
+	Mythic = Color3.fromRGB(255, 60, 120),
+}
+Config.DAMAGE_TYPE_COLORS = { Physical = Color3.fromRGB(230, 120, 50), Magical = Color3.fromRGB(150, 90, 255) }
+Config.ELEMENT_ICONS = { Fire = "🔥", Ice = "❄", Lightning = "⚡", Shadow = "🌑", Water = "💧", Earth = "🪨", Light = "✨" }
+
 return Config
