@@ -101,6 +101,42 @@ local function toggleRow(order, label, key)
 	table.insert(refreshers, refresh)
 end
 
+-- Auto-sell threshold: click cycles rarities (low -> high). Picking a rarity at/above
+-- Summon.CONFIRM_FROM arms a confirm first ("Confirm Mythic?", 3s), a second click applies it.
+local function rarityRow(order, label, key)
+	local Summon = require(Shared.Summon)
+	local r = row(order)
+	Theme.label({ Text = label, Size = UDim2.new(1, -170, 1, -12), Position = UDim2.fromOffset(12, 6), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23 }, r)
+	local b = chunky("", ACCENT, r, { Size = UDim2.fromOffset(150, 32), Position = UDim2.new(1, -160, 0.5, -16) })
+	local armed, pendingValue = 0, nil
+	local function refresh()
+		b.Text = "Up to " .. tostring(ClientSettings.get()[key])
+	end
+	b.Activated:Connect(function()
+		local cur = ClientSettings.get()[key]
+		local nextR = Summon.RARITIES[(Summon.rank(cur) % #Summon.RARITIES) + 1]
+		if pendingValue and os.clock() < armed then
+			nextR, pendingValue, armed = pendingValue, nil, 0
+		elseif Summon.rank(nextR) >= Summon.rank(Summon.CONFIRM_FROM) then
+			pendingValue, armed = nextR, os.clock() + 3
+			b.Text = "Confirm " .. nextR .. "?"
+			task.delay(3, function()
+				if os.clock() >= armed then
+					pendingValue = nil
+					refresh()
+				end
+			end)
+			return
+		end
+		local ok, why = ClientSettings.set(key, nextR)
+		if not ok then
+			Toast.show("Couldn't change " .. label .. ": " .. tostring(why), "error")
+		end
+		refresh()
+	end)
+	table.insert(refreshers, refresh)
+end
+
 local function sliderRow(order, label, key)
 	local r = row(order)
 	local text = Theme.label({ Size = UDim2.new(0.4, -12, 1, -12), Position = UDim2.fromOffset(12, 6), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23 }, r)
@@ -243,6 +279,10 @@ local function build(screen)
 	toggleRow(n(), "Low graphics", "lowGraphics")
 	toggleRow(n(), "Damage numbers", "damageNumbers")
 	toggleRow(n(), "Hide other players' units", "hideOthers")
+	header("Summon", n())
+	toggleRow(n(), "Skip summon animation", "skipSummonAnim")
+	toggleRow(n(), "Auto-sell summoned units", "autoSell")
+	rarityRow(n(), "Auto-sell rarity", "autoSellMax")
 	header("Audio", n())
 	sliderRow(n(), "Music", "music")
 	sliderRow(n(), "SFX", "sfx")

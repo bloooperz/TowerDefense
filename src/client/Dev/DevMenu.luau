@@ -183,6 +183,11 @@ local function build()
 			Net.send("DevGiveItem", it.id, 5)
 		end)
 	end
+	for i, n in ipairs({ 1000, 100000 }) do
+		btn(("+%d Gold (summon testing)"):format(n), Theme.World.YELLOW, body, 41 + i).Activated:Connect(function()
+			Net.send("DevGiveGold", n)
+		end)
+	end
 	btn("+1 copy of selected sandbox unit (fuse test)", ROW, body, 45).Activated:Connect(function()
 		Net.send("DevGiveUnit", getUnit().id)
 	end)

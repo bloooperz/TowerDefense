@@ -45,7 +45,7 @@ local RIGHT = {
 	{ name = "Profile", key = "U" },
 	{ name = "Friends", key = "G" },
 }
-local CURRENCIES = { -- placeholder until Gold/Rerolls exist in DataSchema
+local CURRENCIES = { -- attribute-driven: updates on summon / sell / auto-sell replicate()
 	{ attr = "Gems", color = Color3.fromRGB(90, 200, 255) },
 	{ attr = "Gold", color = Color3.fromRGB(255, 210, 60) },
 	{ attr = "Rerolls", color = Color3.fromRGB(200, 120, 255) },
@@ -215,6 +215,7 @@ function LobbyUI.init()
 	end
 	watchCircles()
 	require(script.Parent.Progression).build(panels)
+	require(script.Parent.SummonUI).build(panels.Summon)
 
 	sidePanel(LEFT, 0, 0)
 	sidePanel(RIGHT, 1, 1)
@@ -255,6 +256,7 @@ function LobbyUI.init()
 	Net.listen("MatchState", function(s)
 		LobbyUI.setVisible(s == "lobby")
 	end)
+	require(script.Parent.StarterUI).init(screen)
 	log.info("lobby UI ready")
 end
 

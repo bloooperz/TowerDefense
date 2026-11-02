@@ -123,6 +123,10 @@ local function joinMatch(plr)
 	if inMatch[plr] then
 		return "Already in the match"
 	end
+	local pd = PlayerData.get(plr)
+	if not (pd and pd.starterChosen) then
+		return "Choose your starter unit first"
+	end
 	if state ~= "waiting" then
 		return "No open match to join (" .. state .. ")"
 	end
@@ -462,6 +466,10 @@ function Match.init(infoFolder)
 
 	-- Offer pick (idle) / join (waiting); used by the portal and the lobby Play button.
 	local function offer(plr)
+		local d = PlayerData.get(plr)
+		if not (d and d.starterChosen) then
+			return "Choose your starter unit first"
+		end
 		if state == "idle" then
 			offeredAt[plr] = os.clock()
 			Net.fire("OpenMapSelect", plr, { kind = "pick" })
@@ -660,6 +668,34 @@ function Match.init(infoFolder)
 			return why
 		end
 		Net.fire("Notify", plr, ("Fused %d into %s: Lv %d -> %d"):format(#feed, u.unitId, before, u.level), "info")
+		return nil
+	end)
+
+	Net.on("Summon", function(plr, tier)
+		local why, results, back = PlayerData.summon(plr, tier)
+		if why then
+			return why
+		end
+		local d = PlayerData.get(plr)
+		Net.fire("SummonResult", plr, { results = results, gems = d and d.gems or 0, gold = d and d.gold or 0, pity = d and d.summonPity or 0, back = back })
+		return nil
+	end)
+
+	Net.on("ClaimStarter", function(plr, unitId)
+		local why = PlayerData.claimStarter(plr, unitId)
+		if why then
+			return why
+		end
+		Net.fire("Notify", plr, ("Starter chosen: %s (+%d Gems)"):format(unitId, require(Shared.Summon).STARTER_GEMS), "info")
+		return nil
+	end)
+
+	Net.on("SellOwnedUnit", function(plr, uid)
+		local why, u, gold = PlayerData.sellUnit(plr, uid)
+		if why then
+			return why
+		end
+		Net.fire("Notify", plr, ("Sold %s for %d Gold"):format(u.unitId, gold), "info")
 		return nil
 	end)
 

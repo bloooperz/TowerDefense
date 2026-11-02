@@ -127,7 +127,7 @@ return function(t)
 			bad = "junk",
 		}, loadout = { "x", "x", "y" }, stats = {}, settings = {} }
 		local d = D.migrate(old, gen, { "Basic" })
-		t.eq(d.version, 4); t.eq(type(d.items), "table"); t.eq(type(d.milestones), "table")
+		t.eq(d.version, D.VERSION); t.eq(type(d.items), "table"); t.eq(type(d.milestones), "table")
 		t.eq(d.units.x.level, 4); t.eq(d.units.x.xp, 50); t.eq(d.units.bad, nil)
 		t.eq(d.units.y.level, 50)
 		UL.normalize(d.units.y) -- server normalizes after migrate
@@ -136,6 +136,6 @@ return function(t)
 	end)
 	t.test("v1 -> v4 chain still works", function()
 		local d = D.migrate({ version = 1, coins = 7, owned = { "Rapid" } }, gen, { "Basic" })
-		t.eq(d.version, 4); t.eq(d.gems, 7); t.eq(d.units[d.loadout[1]].level, 1); t.eq(type(d.items), "table")
+		t.eq(d.version, D.VERSION); t.eq(d.gems, 7); t.eq(d.units[d.loadout[1]].level, 1); t.eq(type(d.items), "table")
 	end)
 end

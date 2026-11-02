@@ -4,7 +4,7 @@
 -- and update DataSchema.default. reconcile() fills any missing fields from defaults.
 local DataSchema = {}
 
-DataSchema.VERSION = 4
+DataSchema.VERSION = 5
 
 local function deepCopy(t)
 	if type(t) ~= "table" then
@@ -41,12 +41,15 @@ function DataSchema.default(genUid, starter: { string })
 		settings = {}, -- v3: validated by shared/Settings.sanitize (has its own .version)
 		items = {}, -- v4: [itemId] = count (shared/Items)
 		milestones = {}, -- v4: ["<level>"] = true (shared/Milestones, claimed)
+		summonPity = 0, -- v5: rolls since last top-rarity pull (shared/Summon)
+		starterChosen = false, -- v5: starter screen done (Summon.claimStarter grants unit + gems)
 	}
 	for _, id in ipairs(starter) do
 		local uid = genUid()
 		d.units[uid] = DataSchema.newUnit(uid, id)
 		table.insert(d.loadout, uid)
 	end
+	d.starterChosen = #starter > 0
 	return d
 end
 
@@ -98,6 +101,13 @@ DataSchema.MIGRATIONS = {
 			d.milestones = {}
 		end
 	end,
+	-- v4 -> v5: summon pity counter + starter flag. Accounts that already own units skip the
+	-- starter screen (starterChosen = true); no units are added or removed.
+	[4] = function(d)
+		d.starterChosen = d.starterChosen == true or (type(d.units) == "table" and next(d.units) ~= nil)
+		d.summonPity = math.max(math.floor(tonumber(d.summonPity) or 0), 0)
+		d.gold = math.max(math.floor(tonumber(d.gold) or 0), 0)
+	end,
 }
 
 local function reconcile(d, defaults)
@@ -113,7 +123,7 @@ end
 -- Returns migrated data (mutates input). `nil` -> fresh default.
 function DataSchema.migrate(d, genUid, starter: { string }, maxLoadout: number?)
 	if d == nil then
-		return DataSchema.default(genUid, starter)
+		return DataSchema.default(genUid, {}) -- new account: no units until the starter pick
 	end
 	local v = d.version or 1
 	while v < DataSchema.VERSION do
@@ -136,8 +146,8 @@ function DataSchema.migrate(d, genUid, starter: { string }, maxLoadout: number?)
 		end
 	end
 	d.loadout = cleaned
-	-- never leave a player with nothing to play
-	if next(d.units) == nil then
+	-- never leave a player who already picked a starter with nothing to play
+	if next(d.units) == nil and d.starterChosen then
 		for _, id in ipairs(starter) do
 			local uid = genUid()
 			d.units[uid] = DataSchema.newUnit(uid, id)

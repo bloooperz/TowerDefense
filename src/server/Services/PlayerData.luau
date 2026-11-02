@@ -21,6 +21,8 @@ local Milestones = require(Shared.Milestones)
 local Settings = require(Shared.Settings)
 local Keybinds = require(Shared.Keybinds)
 local Log = require(Shared.Log)
+local Summon = require(Shared.Summon)
+local Units = require(Shared.Units)
 local log = Log.new("PlayerData")
 
 local PlayerData = {}
@@ -127,6 +129,8 @@ local function replicate(plr, d)
 	plr:SetAttribute("LoadoutLevels", table.concat(levels, ",")) -- parallel to Loadout
 	plr:SetAttribute("Gold", d.gold or 0) -- placeholder until gold/rerolls exist in DataSchema
 	plr:SetAttribute("Rerolls", d.rerolls or 0)
+	plr:SetAttribute("SummonPity", d.summonPity or 0)
+	plr:SetAttribute("StarterChosen", d.starterChosen == true)
 	local st = Settings.sanitize(d.settings, Keybinds)
 	d.settings = st
 	plr:SetAttribute("Settings", HttpService:JSONEncode(st)) -- client applies on load / change
@@ -468,7 +472,76 @@ function PlayerData.claimMilestone(plr, level)
 	return nil
 end
 
+-- Summon `tier` rolls on the current standard banner (server time). Gems are checked and deducted
+-- in memory before any roll (no yields), units go into d.units, auto-sell applies d.settings.
+-- Returns reason or nil, results, goldBack.
+local rng = Random.new()
+function PlayerData.summon(plr, tier)
+	local d, why = loaded(plr)
+	if not d then
+		return why
+	end
+	local banner = Summon.banner(Summon.window(os.time()), Units.list)
+	local st = d.settings or {}
+	local reason, results, back = Summon.apply(d, tier, banner, { on = st.autoSell == true, max = st.autoSellMax or "Rare" }, {
+		rand = function()
+			return rng:NextNumber()
+		end,
+		genUid = genUid,
+		newUnit = DataSchema.newUnit,
+	})
+	if reason then
+		return reason
+	end
+	log.info(plr.Name, "summoned x" .. tier, "gems now", d.gems, "gold", d.gold, "autosold +" .. back, "pity", d.summonPity)
+	replicate(plr, d)
+	return nil, results, back
+end
+
+-- First-load starter pick (idempotent: starterChosen guards double claims).
+function PlayerData.claimStarter(plr, unitId)
+	local d, why = loaded(plr)
+	if not d then
+		return why
+	end
+	local reason = Summon.claimStarter(d, unitId, genUid, DataSchema.newUnit)
+	if reason then
+		return reason
+	end
+	log.info(plr.Name, "chose starter", unitId, "+" .. Summon.STARTER_GEMS, "gems")
+	replicate(plr, d)
+	task.spawn(save, plr, false) -- persist the grant right away
+	return nil
+end
+
+-- Sell an owned unit for Gold (blocked: unknown uid, equipped/hotbar, locked, last unit).
+function PlayerData.sellUnit(plr, uid)
+	local d, why = loaded(plr)
+	if not d then
+		return why
+	end
+	local u = d.units[uid]
+	local def = u and Units.get(u.unitId)
+	local reason, gold = Summon.checkSell(d, uid, def and def.rarity or "Common", nil)
+	if reason then
+		return reason
+	end
+	d.units[uid] = nil
+	d.gold += gold
+	log.info(plr.Name, "sold", u.unitId, uid, "for", gold, "gold")
+	replicate(plr, d)
+	return nil, u, gold
+end
+
 -- Dev/test helpers (callers must be Studio-only).
+function PlayerData.devGiveGold(plr, n)
+	local d, why = loaded(plr)
+	if not d then
+		return why
+	end
+	d.gold = (d.gold or 0) + n
+	replicate(plr, d)
+end
 function PlayerData.devGrantUnitXp(plr, xp)
 	return PlayerData.grant(plr, { unitXp = xp })
 end

@@ -63,6 +63,8 @@ function MapSelect.init()
 	root = Style.panel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(520, 360), Visible = false }, screen)
 	titleLabel = Style.text({ Text = "Choose a map", Size = UDim2.new(1, 0, 0, 36), Position = UDim2.fromOffset(0, 8) }, root)
 	local maps, modes = column("Map", 0, root), column("Mode", 0.5, root)
+	-- Same reusable drop-rates popup as the Summon panel.
+	require(script.Parent.UI.Rates).button(root, { Position = UDim2.new(1, -100, 0, 10), Size = UDim2.fromOffset(84, 28) })
 	mapsCol, modesCol = maps.Parent, modes.Parent
 	for i, m in ipairs(Maps.list) do
 		local b = button(m.name, maps, i)

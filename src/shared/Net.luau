@@ -26,6 +26,10 @@ Net.DEFS = {
 	UseItem = { dir = "c2s", args = { "string", "string", "number" }, rate = 4 }, -- (unitUid, itemId, count) XP food
 	FuseUnits = { dir = "c2s", args = { "string", "string" }, rate = 2, maxLen = 2000 }, -- (targetUid, "uid,uid,...")
 	ClaimMilestone = { dir = "c2s", args = { "number" }, rate = 3 },
+	Summon = { dir = "c2s", args = { "number" }, rate = 1 }, -- (tier 1/10/50) shared/Summon
+	ClaimStarter = { dir = "c2s", args = { "string" }, rate = 1 }, -- (unitId) first-load starter pick
+	SellOwnedUnit = { dir = "c2s", args = { "string" }, rate = 4 }, -- (unitUid) sell owned unit for Gold
+	SummonResult = { dir = "s2c" }, -- { results = { {unitId, rarity, uid?, sold?} }, gems, gold, pity, back }
 	DamageNumber = { dir = "s2c", unreliable = true }, -- (pos, amount, crit) to the attacking player
 	MatchState = { dir = "s2c" },
 	OpenMapSelect = { dir = "s2c" },
@@ -40,6 +44,7 @@ Net.DEFS = {
 	DevGrantUnitXp = { dir = "c2s", args = { "number" }, rate = 4, studioOnly = true }, -- to equipped units
 	DevGrantPlayerXp = { dir = "c2s", args = { "number" }, rate = 4, studioOnly = true },
 	DevGiveItem = { dir = "c2s", args = { "string", "number" }, rate = 4, studioOnly = true },
+	DevGiveGold = { dir = "c2s", args = { "number" }, rate = 4, studioOnly = true },
 	DevGiveUnit = { dir = "c2s", args = { "string" }, rate = 4, studioOnly = true }, -- duplicate for fuse tests
 	Beam = { dir = "s2c", unreliable = true }, -- (from, to, color) drawn client-side -- (text, kind) toast; kind = "error" | "info"
 }

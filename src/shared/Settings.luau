@@ -8,12 +8,18 @@ Settings.DEFAULTS = {
 	lowGraphics = false,
 	damageNumbers = true,
 	hideOthers = false,
+	skipSummonAnim = false, -- summon reveal: show all results instantly
+	autoSell = false, -- server sells summoned units at/below autoSellMax (shared/Summon)
+	autoSellMax = "Rare",
 	music = 0.5, -- 0..1
 	sfx = 0.7, -- 0..1
 	keybinds = {}, -- overrides only: { [actionId] = KeyCode name }
 }
 
-local BOOLS = { "lowGraphics", "damageNumbers", "hideOthers" }
+local BOOLS = { "lowGraphics", "damageNumbers", "hideOthers", "skipSummonAnim", "autoSell" }
+-- string enums: field -> allowed values (keep autoSellMax in sync with Summon.RARITIES)
+local ENUMS = { autoSellMax = { "Common", "Rare", "Epic", "Legendary", "Mythic" } }
+Settings.ENUMS = ENUMS
 local VOLUMES = { "music", "sfx" }
 
 -- Migrations for the settings blob itself: MIGRATIONS[n] upgrades n -> n+1.
@@ -44,6 +50,15 @@ function Settings.sanitize(raw, Keybinds)
 				out[k] = raw[k]
 			else
 				table.insert(problems, k .. " must be true/false")
+			end
+		end
+	end
+	for k, allowed in pairs(ENUMS) do
+		if raw[k] ~= nil then
+			if type(raw[k]) == "string" and table.find(allowed, raw[k]) then
+				out[k] = raw[k]
+			else
+				table.insert(problems, k .. " is not a valid choice")
 			end
 		end
 	end

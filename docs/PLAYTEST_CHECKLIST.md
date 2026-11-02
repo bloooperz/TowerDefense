@@ -23,15 +23,19 @@ Result: ____
 
 ## 1. Join
 
-1. Start the game and wait in the lobby.
-2. Watch the bottom bar and the unit cards during the first few seconds.
+1. Start the game with a **new** account (or one with no saved data) and wait in the lobby.
+2. Watch the screen during the first few seconds.
 
 PASS if all of these are true:
 - [ ] The lobby loads and you can walk around.
 - [ ] No **red** lines in Output. Orange warnings are covered in section 8.
 - [ ] The level bar reads exactly **`Level 1 [0/100]`** with an empty fill.
-- [ ] While loading, the unit cards show the 4 starter units (Basic, Sniper, Rapid, Mogumo) at **Lv 1** with grey blocky (R6) placeholder portraits. They switch to real data shortly after.
-- [ ] A **new** account shows **0 Gems, 0 Gold, 0 Rerolls**.
+- [ ] A **new** account starts with **no units** and shows **0 Gems, 0 Gold, 0 Rerolls**.
+- [ ] A **"Choose your starter"** screen appears over the lobby. It shows one card: **Basic**.
+- [ ] Before choosing, pressing **P** / Play shows the toast *"Choose your starter unit first"* and no stage starts.
+- [ ] Click **Choose** (try double-clicking). You get exactly **one** Basic on the hotbar, Gems become **500**, and the screen closes.
+- [ ] Rejoin: the starter screen does **not** come back, and you still have 1 Basic and 500 Gems.
+- [ ] An **older** account that already had units does not see the starter screen.
 - [ ] The text "Label" does not appear anywhere on screen.
 
 FAIL if any of these are false.
@@ -40,13 +44,26 @@ Result: ____
 
 ---
 
-## 2. Summon x1: NOT IMPLEMENTED YET / SKIP
+## 2. Summon
 
-There is no summon system in the code yet: no summon cost, no gacha and no pity counter. The Summon button (F) and the gold Summon circle open a **"Coming soon"** placeholder panel.
+Default values: **50 Gems per roll**. x1 = 50, x10 = 500, x50 = 2500 (no bonus). Rates: Rare 78.5%, Epic 21.5% (Legendary 3% and Mythic 0.5% pass down to Epic because no summonable unit has those rarities yet). Pity: Epic guaranteed by roll **300**. The banner changes every **30 minutes** and is the same on every server. **Mogumo is never in the banner.**
 
-Quick check only:
 1. Press **F** or walk into the gold Summon circle.
-- PASS: a Summon panel opens with no red errors in Output.
+- [ ] The Summon panel opens (not "Coming soon"). It shows banner unit cards (Basic, Rapid, Sniper, never Mogumo), a **"rotates in mm:ss"** countdown that ticks down, **Pity 0 / 300**, the x1/x10/x50 buttons with their Gem cost, and a **Rates** button.
+2. Click **Rates**.
+- [ ] A popup lists the rarity percentages and units. Close it with **X**.
+3. With 500 Gems, click **Summon x1**.
+- [ ] Gems go **500 -> 450** right away. One card pops in, with a **Skip** button during the reveal. Pity goes up by 1 unless the result was Epic (Epic resets it to 0). The new unit appears in the Units panel.
+4. Click **Summon x10** with fewer than 500 Gems.
+- [ ] Toast *"Not enough Gems"*. Gems do not change.
+5. Settings > Summon: turn on **Skip summon animation**, then summon again.
+- [ ] All result cards appear at once.
+6. Settings > Summon: turn on **Auto-sell** with the threshold **Rare**, then summon.
+- [ ] Rare results show **"Auto-sold +10"**, are not added to your units, and Gold goes up right away. Epic results are kept. Picking **Mythic** as the threshold asks you to click again to confirm.
+7. Units panel: select a unit that is **not** on your hotbar and click **Sell for N Gold** (Rare 10, Epic 20, Legendary 40, Mythic 100).
+- [ ] The unit is removed and Gold goes up. Selling a hotbar unit, or your last unit, is refused with a toast. Mythic and above ask you to confirm.
+8. Press **P** / Play and click **Rates** in the map picker.
+- [ ] The same rates popup opens.
 
 Result: ____
 
@@ -56,7 +73,7 @@ Result: ____
 
 1. Press **P** or click **Play**, choose a map (Training Grounds or Zigzag Valley) and a mode (**Story** = 10 waves, or **Infinite**).
 2. You start the match with **200 cash**. Press **1–6** to choose a hotbar unit, then click a valid spot beside the path. Press **Q** to cancel placement.
-3. Place several units. Starting costs: Basic 50, Rapid 90, Sniper 120, Mogumo 150.
+3. Place several units. In-match placement costs: Basic 50, Rapid 90, Sniper 120 (Mogumo 150, but he can no longer be summoned; only old test accounts still own him).
 
 PASS if:
 - [ ] The placement preview shows; units can't be placed on the path or overlapping other units.
@@ -107,12 +124,12 @@ Result: ____
 
 This tests the new save fixes: saves retry on failure, the game never takes over another server's data lock, and a server that loses the player's session reloads their data instead of keeping an old copy.
 
-1. Before leaving, write down your Level bar text, Gems, unit levels/XP, and Gold/Rerolls. There is no pity counter to record (see section 2).
+1. Before leaving, write down your Level bar text, Gems, unit levels/XP, Gold/Rerolls, and the **Pity X / 300** number in the Summon panel.
 2. Leave the game: stop Play in Studio, or leave the published game.
 3. **Wait about 10 seconds**, then rejoin.
 
 PASS if:
-- [ ] Level, XP, Gems, units (and their levels/XP) and loadout are exactly what you wrote down.
+- [ ] Level, XP, Gems, Gold, units (and their levels/XP), loadout and **Pity** are exactly what you wrote down.
 - [ ] No red errors in Output.
 
 Expected and **not** a bug: if you rejoin very quickly in the published game, the previous server may still hold your data. The game then **waits up to 90 seconds** while loading. If it's still held after that, you'll be kicked with *"Your data is still open on another server. Please wait a minute and rejoin."* Just rejoin after a minute. FAIL only if your data comes back wrong, or this keeps happening after waiting.

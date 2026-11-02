@@ -2,7 +2,7 @@
 -- (Net studioOnly) and every handler re-checks IsStudio. Cheat state is in memory only and
 -- never written to PlayerData/DataStore (attributes like Rerolls are display-only; saves use
 -- the data table). EXCEPTION: the leveling test buttons (DevGrantUnitXp / DevGrantPlayerXp /
--- DevGiveItem / DevGiveUnit) intentionally write real progression so save/rejoin can be tested.
+-- DevGiveItem / DevGiveUnit / DevGiveGold) intentionally write real progression so save/rejoin can be tested.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local RS = game:GetService("ReplicatedStorage")
@@ -193,6 +193,13 @@ function Dev.init()
 			return "Count must be 1..999"
 		end
 		return PlayerData.devGiveItem(plr, itemId, math.floor(n))
+	end))
+	Net.on("DevGiveGold", guard(function(plr, n)
+		if n < 1 or n > 1e7 then
+			return "Gold must be 1..10,000,000"
+		end
+		Net.fire("Notify", plr, ("+%d Gold"):format(n), "info")
+		return PlayerData.devGiveGold(plr, math.floor(n))
 	end))
 	Net.on("DevGiveUnit", guard(function(plr, unitId)
 		if not Units.get(unitId) then

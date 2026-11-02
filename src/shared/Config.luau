@@ -22,7 +22,7 @@ Config.TARGET_MODES = { "First", "Last", "Strongest", "Weakest", "Closest" }
 
 -- LOADOUT / PROGRESSION
 Config.LOADOUT_SIZE = 6
-Config.STARTER_LOADOUT = { "Basic", "Sniper", "Rapid", "Mogumo" }
+Config.STARTER_LOADOUT = { "Basic" } -- loading placeholder cards + safety refill only (new accounts pick via shared/Summon.STARTERS)
 
 -- SERVER
 Config.TICK_RATE = 0.1 -- seconds between server simulation ticks

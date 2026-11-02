@@ -12,6 +12,7 @@ local UnitLevel = require(Shared.UnitLevel)
 local PlayerLevel = require(Shared.PlayerLevel)
 local Items = require(Shared.Items)
 local Milestones = require(Shared.Milestones)
+local Summon = require(Shared.Summon)
 local Net = require(Shared.Net)
 local Log = require(Shared.Log)
 local Theme = require(script.Parent.Parent.UI.Theme)
@@ -101,6 +102,7 @@ local function buildUnits(panel)
 	Theme.make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, right)
 	local selected = nil
 	local fuseSel = {}
+	local sellArm = nil -- uid armed for a Mythic+ sell confirm
 
 	local function render()
 		local inv = decode("Inventory", {})
@@ -206,6 +208,32 @@ local function buildUnits(panel)
 			end
 			Net.send("FuseUnits", u.uid, table.concat(picked, ","))
 			fuseSel = {}
+		end)
+
+		-- Sell for Gold. Server re-validates everything (equipped/placed/locked/last unit).
+		local rarity = def and def.rarity or "Common"
+		local gold = Summon.SELL_GOLD[rarity] or 0
+		local needConfirm = Summon.rank(rarity) >= Summon.rank(Summon.CONFIRM_FROM)
+		local armed = sellArm == u.uid
+		local sb = btn(armed and ("Confirm: sell %s for %d Gold?"):format(rarity, gold) or (u.equipped and "Sell (unequip from hotbar first)" or ("Sell for %d Gold"):format(gold)), armed and Theme.World.RED or (u.equipped and Color3.fromRGB(70, 74, 82) or Theme.World.ORANGE), right, { LayoutOrder = 30, Size = UDim2.new(1, 0, 0, 34) })
+		sb.Activated:Connect(function()
+			if u.equipped then
+				Toast.show("Can't sell a unit on your hotbar", "error")
+				return
+			end
+			if needConfirm and sellArm ~= u.uid then
+				sellArm = u.uid
+				render()
+				task.delay(3, function()
+					if sellArm == u.uid then
+						sellArm = nil
+						Log.try("Progression", "units render", render)
+					end
+				end)
+				return
+			end
+			sellArm = nil
+			Net.send("SellOwnedUnit", u.uid)
 		end)
 	end
 

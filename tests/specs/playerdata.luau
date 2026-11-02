@@ -2,7 +2,7 @@
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 
-local SHARED = { "Config", "DataSchema", "UnitLevel", "PlayerLevel", "Items", "Milestones", "Settings", "Keybinds", "Log", "Net" }
+local SHARED = { "Config", "DataSchema", "UnitLevel", "PlayerLevel", "Items", "Milestones", "Settings", "Keybinds", "Log", "Net", "Summon", "Units" }
 
 local function newEnv()
 	local warns = {}
@@ -14,6 +14,8 @@ local function newEnv()
 	local function req(m)
 		if type(m) == "table" and m.__mod == "Config" then
 			return { STARTER_LOADOUT = { "Basic", "Sniper", "Rapid", "Mogumo" }, LOADOUT_SIZE = 6 }
+		elseif type(m) == "table" and m.__mod == "Units" then
+			return { list = {}, get = function() return nil end }
 		elseif type(m) == "table" and m.__mod then
 			cache[m.__mod] = cache[m.__mod] or require("../../src/shared/" .. m.__mod)
 			return cache[m.__mod]
@@ -39,6 +41,7 @@ local function newEnv()
 		warn = function(...) table.insert(warns, table.concat({ ... }, " ")) end,
 		print = function() end,
 		Instance = { new = function() return { Event = signal, Fire = function() end } end },
+		Random = { new = function() return { NextNumber = function() return math.random() end } end },
 	}, { __index = _G })
 	local PD = luau.load(fs.readFile("src/server/Services/PlayerData.luau"), { debugName = "PlayerData", environment = env, injectGlobals = true })()
 	local slept = {}
