@@ -17,10 +17,10 @@ local mapButtons, modeButtons = {}, {}
 
 local function paint()
 	for id, b in pairs(mapButtons) do
-		b.BackgroundColor3 = id == chosenMap and Style.BLUE or Style.MID
+		b.BackgroundColor3 = id == chosenMap and Style.ORANGE or Style.MID
 	end
 	for id, b in pairs(modeButtons) do
-		b.BackgroundColor3 = id == chosenMode and Style.BLUE or Style.MID
+		b.BackgroundColor3 = id == chosenMode and Style.ORANGE or Style.MID
 	end
 end
 

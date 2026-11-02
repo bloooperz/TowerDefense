@@ -13,6 +13,7 @@ local MapSelect = require(script.Parent.MapSelect)
 local Results = require(script.Parent.Results)
 local Toast = require(script.Parent.Toast)
 local LobbyUI = require(script.Parent.Lobby.LobbyUI)
+local Shape = require(script.Parent.UI.Shape)
 local Input = require(script.Parent.Input)
 local SettingsUI = require(script.Parent.Settings.SettingsUI)
 local Log = require(RS.Shared.Log)
@@ -146,3 +147,6 @@ UIS.InputBegan:Connect(function(input, processed)
 		end
 	end
 end)
+
+-- Text pass: GothamBold body font + dark outline on every label under PlayerGui.
+Shape.styleText(game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"))

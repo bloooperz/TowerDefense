@@ -7,6 +7,7 @@ local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
 local MyUnits = require(script.Parent.MyUnits)
 local Style = require(script.Parent.Style)
+local Theme = require(script.Parent.UI.Theme)
 
 local Hotbar = {}
 local slots, counts = {}, {}
@@ -49,8 +50,10 @@ local function rebuild()
 		b.Text = i .. "\n" .. u.name .. "\n$" .. u.cost
 		b.Font = Style.FONT
 		b.LayoutOrder = i
-		b.BackgroundColor3 = Style.MID
-		local stroke = Style.shape(b, 8, Style.STROKE)
+		-- unit palette: neutral charcoal, rarity-colored border only
+		local rarity = Config.RARITY_COLORS[u.rarity or "Common"] or Theme.Unit.BORDER
+		local stroke = Style.unitShape(b, rarity)
+		stroke.rarity = rarity
 		b.MouseButton1Click:Connect(function()
 			if Hotbar.onSelect then
 				Hotbar.onSelect(i)
@@ -99,7 +102,7 @@ end
 
 function Hotbar.highlight(index)
 	for i, s in ipairs(slots) do
-		s.setEdge((i == index) and Color3.fromRGB(255, 220, 0) or Style.STROKE, (i == index) and 2 or 1.5)
+		s.setEdge((i == index) and Color3.new(1, 1, 1) or s.rarity, (i == index) and 3 or 2.5)
 	end
 end
 

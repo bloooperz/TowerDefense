@@ -28,7 +28,10 @@ return function(ctx)
 		end
 		assert(#bad == 0, "non-ASCII glyphs found:\n" .. table.concat(bad, "\n"))
 	end)
-	t("no UICorner outside UI/Shape", function()
+	t("corners: UICorner only via UI/Shape, radius clamped to 8px or less", function()
+		local shape = fs.readFile("src/client/UI/Shape.luau")
+		local max = tonumber(shape:match("MAX_RADIUS = %d+, (%d+)"))
+		assert(max and max <= 8, "Shape MAX_RADIUS must be <= 8")
 		for _, p in ipairs(walk("src", {})) do
 			if not p:match("UI/Shape%.luau$") then
 				assert(not fs.readFile(p):find("UICorner"), "UICorner in " .. p)

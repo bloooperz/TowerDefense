@@ -17,8 +17,8 @@ local ClientSettings = require(script.Parent.ClientSettings)
 local log = Log.new("SettingsUI")
 
 local SettingsUI = {}
-local ACCENT = Color3.fromRGB(140, 150, 255)
-local GREY = Color3.fromRGB(90, 88, 110)
+local ACCENT = Theme.World.BORDER_HOT -- world palette (warm)
+local GREY = Color3.fromRGB(92, 76, 66)
 local panel, list
 local inMatch = false
 local matchButtons = {} -- { btn, color, label }
@@ -36,7 +36,7 @@ local function header(text, order)
 end
 
 local function row(order, height)
-	local r = Theme.make("Frame", { Size = UDim2.new(1, -8, 0, height or 44), BackgroundColor3 = Color3.fromRGB(44, 40, 68), LayoutOrder = order, ZIndex = 22 }, list)
+	local r = Theme.make("Frame", { Size = UDim2.new(1, -8, 0, height or 44), BackgroundColor3 = Theme.World.BASE_2, LayoutOrder = order, ZIndex = 22 }, list)
 	Theme.round(r, 10)
 	Theme.stroke(r, 2)
 	return r
@@ -51,9 +51,7 @@ local function chunky(text, color, parent, props)
 	for k, v in pairs(props or {}) do
 		b[k] = v
 	end
-	Theme.round(b, 10)
-	Theme.stroke(b, 3)
-	Theme.gloss(b)
+	Theme.button(b, color)
 	return b
 end
 
@@ -91,7 +89,7 @@ local function toggleRow(order, label, key)
 	local function refresh()
 		local on = ClientSettings.get()[key]
 		b.Text = on and "ON" or "OFF"
-		b.BackgroundColor3 = on and Color3.fromRGB(60, 200, 90) or GREY
+		b.BackgroundColor3 = on and Theme.World.GREEN or GREY
 	end
 	b.Activated:Connect(function()
 		local ok, why = ClientSettings.set(key, not ClientSettings.get()[key])
@@ -106,7 +104,7 @@ end
 local function sliderRow(order, label, key)
 	local r = row(order)
 	local text = Theme.label({ Size = UDim2.new(0.4, -12, 1, -12), Position = UDim2.fromOffset(12, 6), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23 }, r)
-	local track = Theme.make("TextButton", { Text = "", AutoButtonColor = false, Size = UDim2.new(0.6, -24, 0, 12), Position = UDim2.new(0.4, 6, 0.5, -6), BackgroundColor3 = Color3.fromRGB(20, 18, 34), ZIndex = 23 }, r)
+	local track = Theme.make("TextButton", { Text = "", AutoButtonColor = false, Size = UDim2.new(0.6, -24, 0, 12), Position = UDim2.new(0.4, 6, 0.5, -6), BackgroundColor3 = Theme.World.BASE, ZIndex = 23 }, r)
 	Theme.round(track, 6)
 	local fill = Theme.make("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = ACCENT, ZIndex = 24 }, track)
 	Theme.round(fill, 6)
@@ -224,14 +222,14 @@ local function build(screen)
 	end
 	header("Match", n())
 	local mr = row(n(), 56)
-	confirmButton("Restart", Color3.fromRGB(255, 160, 40), mr, { Size = UDim2.new(0.5, -18, 1, -14), Position = UDim2.fromOffset(12, 7) }, function()
+	confirmButton("Restart", Theme.World.ORANGE, mr, { Size = UDim2.new(0.5, -18, 1, -14), Position = UDim2.fromOffset(12, 7) }, function()
 		Net.send("RequestRestart")
 	end)
-	confirmButton("Leave", Color3.fromRGB(230, 50, 70), mr, { Size = UDim2.new(0.5, -18, 1, -14), Position = UDim2.new(0.5, 6, 0, 7) }, function()
+	confirmButton("Leave", Theme.World.RED, mr, { Size = UDim2.new(0.5, -18, 1, -14), Position = UDim2.new(0.5, 6, 0, 7) }, function()
 		Net.send("LeaveMatch")
 		Panel.closeCurrent()
 	end)
-	local only = Theme.label({ Text = "Only in a match", Size = UDim2.new(1, 0, 0, 20), TextColor3 = Color3.fromRGB(180, 178, 200), LayoutOrder = n(), ZIndex = 22 }, list)
+	local only = Theme.label({ Text = "Only in a match", Size = UDim2.new(1, 0, 0, 20), TextColor3 = Theme.World.MUTED, LayoutOrder = n(), ZIndex = 22 }, list)
 	table.insert(refreshers, function()
 		only.Visible = not inMatch
 		for _, m in ipairs(matchButtons) do
@@ -254,7 +252,7 @@ local function build(screen)
 		bindRow(n(), a)
 	end
 	local rr = row(n(), 48)
-	chunky("Reset to defaults", Color3.fromRGB(60, 140, 255), rr, { Size = UDim2.new(1, -24, 1, -12), Position = UDim2.fromOffset(12, 6) }).Activated:Connect(function()
+	chunky("Reset to defaults", Theme.World.BLUE, rr, { Size = UDim2.new(1, -24, 1, -12), Position = UDim2.fromOffset(12, 6) }).Activated:Connect(function()
 		stopCapture()
 		local ok, err = ClientSettings.set("keybinds", {})
 		if ok then
@@ -292,7 +290,7 @@ function SettingsUI.init()
 	local player = Players.LocalPlayer
 	local screen = Theme.make("ScreenGui", { Name = "Settings", ResetOnSpawn = false, DisplayOrder = 20, ZIndexBehavior = Enum.ZIndexBehavior.Sibling }, player:WaitForChild("PlayerGui"))
 	build(screen)
-	local holder = Button.new({ name = "Settings", size = 64, color = ACCENT, onClick = SettingsUI.toggle }, screen)
+	local holder = Button.new({ name = "Settings", keyAction = "settings", size = 64, color = ACCENT, onClick = SettingsUI.toggle }, screen)
 	holder.AnchorPoint = Vector2.new(0, 1)
 	holder.Position = UDim2.new(0, 16, 1, -16)
 	UIS.InputBegan:Connect(function(input)

@@ -42,13 +42,8 @@ local CURRENCIES = { -- placeholder until Gold/Rerolls exist in DataSchema
 }
 
 local screen, panels, hotbar, levelFill, levelText = nil, {}, nil, nil, nil
-local actions, keyMap, keyLabels = {}, {}, {}
+local actions, keyMap = {}, {}
 local Input = require(script.Parent.Parent.Input)
-Input.onChanged(function()
-	for name, lbl in pairs(keyLabels) do
-		lbl.Text = Input.keyFor(name) or ""
-	end
-end)
 
 local function openPanel(name)
 	panels[name].toggle() -- Panel manager closes whatever else is open
@@ -90,43 +85,31 @@ local function sidePanel(list, anchorX, posX)
 		AnchorPoint = Vector2.new(anchorX, 0.5),
 		Position = UDim2.new(posX, anchorX == 0 and 16 or -16, 0.5, 0),
 		Size = UDim2.fromOffset(2 * 84 + 3 * 12, rows * 84 + (rows + 1) * 12),
-		BackgroundColor3 = Theme.PANEL,
-		BackgroundTransparency = 0.25,
 	}, screen)
-	Theme.round(f, 20)
-	Theme.stroke(f, 4)
+	Theme.panel(f)
 	Theme.make("UIPadding", { PaddingTop = UDim.new(0, 12), PaddingLeft = UDim.new(0, 12) }, f)
 	Theme.make("UIGridLayout", { CellSize = UDim2.fromOffset(84, 84), CellPadding = UDim2.fromOffset(12, 12), SortOrder = Enum.SortOrder.LayoutOrder }, f)
 	for i, def in ipairs(list) do
-		local keyName = Input.keyFor(def.name) or def.key
 		local h = Button.new({
-			name = def.name, key = keyName, isNew = def.isNew,
+			name = def.name, keyAction = def.name, isNew = def.isNew,
 			color = Theme.COLORS[def.name],
 			onClick = actions[def.name],
 		}, f)
 		h.LayoutOrder = i
 		keyMap[def.name] = true -- shortcut keys resolved through Input (rebindable)
-		for _, d in ipairs(h:GetDescendants()) do
-			if d:IsA("TextLabel") and d.Text == keyName and d.Size == UDim2.fromOffset(20, 20) then
-				keyLabels[def.name] = d
-			end
-		end
 	end
 end
 
 local function eventBanner()
 	local holder = Theme.make("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 8), Size = UDim2.fromOffset(300, 100), BackgroundTransparency = 1 }, screen)
 	-- label sits fully above the card+glow (glow spreads 6px) and on a higher ZIndex
-	Theme.label({ Text = "EVENTS", Size = UDim2.new(1, 0, 0, 24), ZIndex = 5, TextColor3 = Color3.fromRGB(255, 230, 120) }, holder)
+	Theme.label({ Text = "EVENTS", Font = Theme.FONT, Size = UDim2.new(1, 0, 0, 24), ZIndex = 5, TextColor3 = Theme.World.YELLOW }, holder)
 	local card = Theme.make("TextButton", { Text = "", AutoButtonColor = false, Position = UDim2.fromOffset(0, 36), Size = UDim2.new(1, 0, 0, 62), BackgroundColor3 = Theme.COLORS.Event, ZIndex = 2 }, holder)
-	Theme.round(card, 14)
-	Theme.stroke(card, 3)
-	Theme.gloss(card)
-	local glow = Theme.glow(card, Theme.COLORS.Event, 6)
-	Theme.label({ Text = "Shadow Festival", Size = UDim2.new(1, -16, 0, 30), Position = UDim2.fromOffset(8, 4), ZIndex = 3 }, card)
-	Theme.label({ Text = "Ends in 3d 12h (placeholder)", Size = UDim2.new(1, -16, 0, 18), Position = UDim2.fromOffset(8, 38), ZIndex = 3, TextColor3 = Color3.fromRGB(255, 240, 210) }, card)
-	-- pulse glow
-	TweenService:Create(glow, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { BackgroundTransparency = 0.25 }):Play()
+	Theme.shape.apply(card, { radius = 8, fill = Theme.World.BASE, transparency = 0, edge = Theme.COLORS.Event, thickness = 3 })
+	Theme.label({ Text = "Shadow Festival", Font = Theme.FONT, TextColor3 = Theme.World.ORANGE, Size = UDim2.new(1, -16, 0, 30), Position = UDim2.fromOffset(8, 4), ZIndex = 3 }, card)
+	Theme.label({ Text = "Ends in 3d 12h (placeholder)", Size = UDim2.new(1, -16, 0, 18), Position = UDim2.fromOffset(8, 38), ZIndex = 3, TextColor3 = Theme.World.MUTED }, card)
+	-- pulse the border (glow is reserved for unit cards)
+	TweenService:Create(Theme.shape.get(card).stroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Color = Theme.World.YELLOW }):Play()
 	card.Activated:Connect(function()
 		openPanel("Event")
 	end)
@@ -136,10 +119,8 @@ local function currencies(parent)
 	local bar = Theme.make("Frame", { Size = UDim2.fromOffset(420, 40), BackgroundTransparency = 1, LayoutOrder = 1 }, parent)
 	Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 10) }, bar)
 	for _, c in ipairs(CURRENCIES) do
-		local pill = Theme.make("Frame", { Size = UDim2.fromOffset(130, 36), BackgroundColor3 = Theme.PANEL }, bar)
-		Theme.round(pill, 18)
-		Theme.stroke(pill, 3)
-		Theme.make("UIStroke", { Thickness = 1.5, Color = c.color, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Transparency = 0.2 }, pill)
+		local pill = Theme.make("Frame", { Size = UDim2.fromOffset(130, 36) }, bar)
+		Theme.panel(pill, Theme.World.BORDER)
 		local slot = Theme.shape.iconSlot({ Size = UDim2.fromOffset(26, 26), Position = UDim2.fromOffset(7, 5) }, pill)
 		Theme.shape.tooltip(slot, c.attr, c.color)
 		local n = Theme.label({ Size = UDim2.new(1, -44, 0, 26), Position = UDim2.fromOffset(38, 5), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = c.color }, pill)
@@ -177,12 +158,10 @@ local function rebuildHotbar()
 end
 
 local function levelBar(parent)
-	local bg = Theme.make("Frame", { Size = UDim2.fromOffset(560, 24), BackgroundColor3 = Color3.fromRGB(20, 18, 32), LayoutOrder = 3 }, parent)
-	Theme.round(bg, 12)
-	Theme.stroke(bg, 3)
-	levelFill = Theme.make("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(80, 220, 120) }, bg)
-	Theme.round(levelFill, 12)
-	Theme.gloss(levelFill)
+	local bg = Theme.make("Frame", { Size = UDim2.fromOffset(560, 24), LayoutOrder = 3 }, parent)
+	Theme.panel(bg)
+	levelFill = Theme.make("Frame", { Size = UDim2.fromScale(0, 1) }, bg)
+	Theme.button(levelFill, Theme.World.YELLOW)
 	levelText = Theme.label({ Size = UDim2.new(1, 0, 1, -4), Position = UDim2.fromOffset(0, 2), ZIndex = 3 }, bg)
 	local function upd()
 		local l, into, need = Rewards.levelProgress(player:GetAttribute("Xp") or 0)

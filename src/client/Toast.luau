@@ -38,7 +38,7 @@ function Toast.show(text, kind)
 	end
 	local l = Style.make("TextLabel", {
 		Size = UDim2.fromOffset(420, 30),
-		BackgroundColor3 = kind == "error" and Color3.fromRGB(150, 35, 35) or Style.MID,
+		BackgroundColor3 = kind == "error" and Color3.fromRGB(120, 28, 22) or Style.DARK,
 		BackgroundTransparency = 0.15,
 		TextColor3 = Color3.new(1, 1, 1),
 		Font = Style.FONT,
@@ -46,11 +46,11 @@ function Toast.show(text, kind)
 		Text = tostring(text),
 		LayoutOrder = order,
 	}, holder)
-	local shape = Style.shape(l, 7, kind == "error" and Color3.fromRGB(255, 90, 90) or Style.STROKE)
+	local shape = Style.shape(l, 6, kind == "error" and Style.RED or Style.STROKE)
 	Style.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, l)
 	task.delay(3, function()
 		if l.Parent then
-			shape.box.Visible = false
+			TweenService:Create(shape.stroke, TweenInfo.new(0.4), { Transparency = 1 }):Play()
 			TweenService:Create(l, TweenInfo.new(0.4), { BackgroundTransparency = 1, TextTransparency = 1 }):Play()
 			task.wait(0.4)
 			l:Destroy()

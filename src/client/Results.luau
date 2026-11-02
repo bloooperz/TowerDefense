@@ -35,7 +35,7 @@ function Results.init()
 		TextColor3 = Color3.new(1, 1, 1),
 		Text = "Return to Lobby",
 	}, root)
-	Style.shape(b, 9)
+	Style.button(b, Style.BLUE)
 	b.MouseButton1Click:Connect(function()
 		Net.send("ReturnToLobby")
 		root.Visible = false

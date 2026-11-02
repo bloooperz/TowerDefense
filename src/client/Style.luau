@@ -1,21 +1,35 @@
--- Shared GUI helpers for the anime-TD look.
+-- Shared GUI helpers for in-match / world UI (HUD, results, map picker, toasts). WORLD palette
+-- (warm steampunk) from Theme.World; unit surfaces (hotbar) use Style.unitShape / Theme.Unit.
 local Shape = require(script.Parent.UI.Shape)
+local Theme = require(script.Parent.UI.Theme)
 local Style = {}
+local W = Theme.World
 
-Style.DARK = Color3.fromRGB(16, 14, 30)
-Style.MID = Color3.fromRGB(30, 26, 50)
-Style.STROKE = Color3.fromRGB(130, 110, 255)
-Style.GREEN = Color3.fromRGB(0, 170, 90)
-Style.RED = Color3.fromRGB(200, 55, 55)
-Style.GREY = Color3.fromRGB(70, 70, 80)
-Style.YELLOW = Color3.fromRGB(255, 215, 60)
-Style.BLUE = Color3.fromRGB(60, 140, 255)
-Style.FONT = Enum.Font.GothamBlack
-Style.BODY = Enum.Font.GothamMedium
+Style.DARK = W.BASE
+Style.MID = W.BASE_2
+Style.STROKE = W.BORDER
+Style.GREEN = W.GREEN
+Style.RED = W.RED
+Style.GREY = Color3.fromRGB(92, 76, 66)
+Style.YELLOW = W.YELLOW
+Style.BLUE = W.BLUE
+Style.ORANGE = W.ORANGE
+Style.FONT = Theme.FONT
+Style.BODY = Theme.BODY
 
--- Chamfered shape (UI/Shape); replaces every rounded corner. edge = Color3? (default house neon)
-function Style.shape(o, cut, edge)
-	return Shape.apply(o, { cut = cut or 8, edge = edge })
+-- Rounded world surface: dark fill (unless already colored) + thick brass/colored border.
+function Style.shape(o, radius, edge)
+	return Shape.apply(o, { radius = radius or 6, edge = edge or Style.STROKE, thickness = 2.5 })
+end
+
+-- Bright solid button (lighter top, darker stroke, hover brighten, press 0.95).
+function Style.button(o, fill)
+	return Theme.button(o, fill or o.BackgroundColor3)
+end
+
+-- Neutral unit surface (hotbar): charcoal, border recolored by rarity/selection by the caller.
+function Style.unitShape(o, edge)
+	return Shape.apply(o, { radius = 6, fill = Theme.Unit.BASE, transparency = Theme.Unit.TRANSPARENCY, edge = edge or Theme.Unit.BORDER, thickness = 2.5 })
 end
 
 function Style.make(class, props, parent)
@@ -28,11 +42,11 @@ function Style.make(class, props, parent)
 end
 
 function Style.panel(props, parent)
-	local f = Style.make("Frame", { BackgroundColor3 = Style.DARK, BackgroundTransparency = 0.1, BorderSizePixel = 0 }, parent)
+	local f = Style.make("Frame", { BackgroundColor3 = Style.DARK, BackgroundTransparency = W.TRANSPARENCY, BorderSizePixel = 0 }, parent)
 	for k, v in pairs(props) do
 		f[k] = v
 	end
-	Shape.apply(f, { cut = 10, edge = Style.STROKE })
+	Shape.apply(f, { radius = 8, edge = Style.STROKE, thickness = 3 })
 	return f
 end
 
@@ -46,7 +60,7 @@ function Style.text(props, parent)
 	for k, v in pairs(props) do
 		l[k] = v
 	end
-	Style.make("UIStroke", { Thickness = 1, Color = Color3.new(0, 0, 0), Transparency = 0.3 }, l)
+	Shape.outlineText(l, 2)
 	return l
 end
 
@@ -55,9 +69,9 @@ function Style.bar(props, fillColor, parent)
 	for k, v in pairs(props) do
 		bg[k] = v
 	end
-	Shape.apply(bg, { cut = 5, edge = Style.STROKE, thickness = 1 })
+	Shape.apply(bg, { radius = 6, edge = Style.STROKE, thickness = 2 })
 	local fill = Style.make("Frame", { BackgroundColor3 = fillColor, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) }, bg)
-	Shape.apply(fill, { cut = 4, edge = fillColor, highlight = false })
+	Shape.apply(fill, { radius = 6, edge = Theme.darkEdge(fillColor), thickness = 2 })
 	local label = Style.text({ Size = UDim2.fromScale(1, 1), ZIndex = 3 }, bg)
 	return bg, fill, label
 end

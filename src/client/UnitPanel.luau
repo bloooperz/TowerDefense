@@ -17,7 +17,7 @@ local log = Log.new("UnitPanel")
 local warned = {} -- [unitName] = true: passive problems are logged/toasted once per unit
 local sideOpen = false
 local SLIDE = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local NEON = Color3.fromRGB(200, 70, 255)
+local NEON = Color3.fromRGB(150, 162, 182) -- unit palette: neutral slate accent (no warm colors)
 
 local UnitPanel = {}
 local refreshPassive
@@ -27,8 +27,8 @@ local gui = {}
 local current, ring, model, conns = nil, nil, nil, {}
 local angle = 0
 
-local DARK = Color3.fromRGB(22, 22, 30)
-local MID = Color3.fromRGB(38, 38, 50)
+local DARK = Theme.Unit.BASE
+local MID = Theme.Unit.BASE_2
 local GREEN = Color3.fromRGB(0, 170, 90)
 local RED = Color3.fromRGB(190, 50, 50)
 local GREY = Color3.fromRGB(70, 70, 80)
@@ -42,7 +42,7 @@ local function make(class, props, parent)
 	return o
 end
 local function round(o, r)
-	return Shape.apply(o, { cut = math.clamp(math.floor((r or 10) * 0.75), 4, 12) })
+	return Shape.apply(o, { radius = math.clamp(math.floor((r or 10) * 0.5), 4, 8), edge = Theme.Unit.BORDER })
 end
 local function text(props, parent)
 	local l = make("TextLabel", {
@@ -190,14 +190,14 @@ function UnitPanel.init(cash, upEv, sellEv, targetEv)
 		Visible = false,
 	}, screen)
 	round(panel, 14)
-	Shape.get(panel).setEdge(Color3.fromRGB(130, 110, 255), 1.5)
+	Shape.get(panel).setEdge(Theme.Unit.BORDER, 3)
 	gui.panel = panel
 
 	gui.name = text({ Position = UDim2.fromOffset(16, 12), Size = UDim2.fromOffset(200, 28) }, panel)
 	gui.level = text({
 		Position = UDim2.fromOffset(16, 40),
 		Size = UDim2.fromOffset(200, 18),
-		TextColor3 = Color3.fromRGB(255, 210, 80),
+		TextColor3 = Color3.new(1, 1, 1),
 	}, panel)
 
 	local close = make("TextButton", {
@@ -259,8 +259,8 @@ function UnitPanel.init(cash, upEv, sellEv, targetEv)
 	}, clip)
 	round(gui.side, 14)
 	Theme.stroke(gui.side, 3)
-	Shape.get(gui.side).setEdge(NEON, 1.5)
-	gui.sideTitle = Theme.label({ Position = UDim2.fromOffset(12, 10), Size = UDim2.new(1, -24, 0, 30), TextColor3 = NEON, TextXAlignment = Enum.TextXAlignment.Left }, gui.side)
+	Shape.get(gui.side).setEdge(Theme.Unit.BORDER, 3)
+	gui.sideTitle = Theme.label({ Position = UDim2.fromOffset(12, 10), Size = UDim2.new(1, -24, 0, 30), TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Left }, gui.side)
 	gui.sideText = Theme.label({
 		Position = UDim2.fromOffset(12, 48), Size = UDim2.new(1, -24, 1, -84),
 		TextScaled = false, TextSize = 17, TextWrapped = true, RichText = true,

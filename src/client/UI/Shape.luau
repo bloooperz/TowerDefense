@@ -1,46 +1,56 @@
--- Chamfered ("cut corner") frame style, no image assets. ONE helper for every UI surface.
--- Shape.apply(gui, opts) turns `gui`'s own background into: a cross of two rects + four 45deg diamonds
--- (the diamond edge IS the chamfer line), a subtle vertical gradient, crisp 1-2px neon edges
--- (4 straight + 4 diagonal hairlines) and an inner top highlight line. gui's background goes transparent;
--- pieces live in a ZIndex-0 "Shape" container so content always draws on top.
--- opts = { cut = px (default 10), edge = Color3?, thickness = 1..2, fill = Color3?, transparency = 0..1,
---          gradient = bool (default true), highlight = bool (default true), hover = bool (auto for buttons) }
+-- The ONE shared frame-style helper (no image assets). Rounded 4-8px corners, thick bright UIStroke
+-- border, subtle vertical UIGradient; buttons get lighter-top gradient + hover brighten / press 0.95.
+-- Also: brush-stroke title banners, card glow, keybind chips, tooltips, blank icon slots.
 local TweenService = game:GetService("TweenService")
 
 local Shape = {}
-Shape.DEFAULT_EDGE = Color3.fromRGB(120, 110, 200)
-local handles = setmetatable({}, { __mode = "k" })
+Shape.DEFAULT_EDGE = Color3.fromRGB(214, 168, 74) -- brass
+Shape.OUTLINE = Color3.fromRGB(14, 10, 8)
+Shape.MIN_RADIUS, Shape.MAX_RADIUS = 4, 8
+
 local QUICK = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local SQRT2 = math.sqrt(2)
+local handles = setmetatable({}, { __mode = "k" })
 
 local function new(class, props, parent)
 	local o = Instance.new(class)
-	for k, v in pairs(props) do
+	for k, v in pairs(props or {}) do
 		o[k] = v
 	end
 	o.Parent = parent
 	return o
 end
+Shape.new = new
 
 local function scaleColor(c, k)
 	return Color3.new(math.clamp(c.R * k, 0, 1), math.clamp(c.G * k, 0, 1), math.clamp(c.B * k, 0, 1))
 end
 Shape.scaleColor = scaleColor
 
--- a UIStroke draws the gui's rectangular border unless it is a text outline on a text object
-local function isBorderStroke(gui, ch)
-	if not ch:IsA("UIStroke") then
-		return false
-	end
-	local text = gui:IsA("TextLabel") or gui:IsA("TextButton") or gui:IsA("TextBox")
-	return ch.ApplyStrokeMode == Enum.ApplyStrokeMode.Border or not text
+local function isText(o)
+	return o:IsA("TextLabel") or o:IsA("TextButton") or o:IsA("TextBox")
 end
 
-local function clean(gui)
-	for _, ch in ipairs(gui:GetChildren()) do
-		if ch:IsA("UICorner") or isBorderStroke(gui, ch) then
-			ch:Destroy()
+-- Dark Contextual outline on text. A GuiObject that already owns a Border stroke cannot also
+-- have a Contextual one, so those fall back to the built-in text stroke.
+function Shape.outlineText(o, thickness)
+	if not isText(o) then
+		return
+	end
+	local border, ctx = nil, nil
+	for _, ch in ipairs(o:GetChildren()) do
+		if ch:IsA("UIStroke") then
+			if ch.ApplyStrokeMode == Enum.ApplyStrokeMode.Border then
+				border = ch
+			else
+				ctx = ch
+			end
 		end
+	end
+	if border then
+		o.TextStrokeColor3, o.TextStrokeTransparency = Shape.OUTLINE, 0
+	elseif not ctx then
+		new("UIStroke", { Name = "TextOutline", ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Color = Shape.OUTLINE, Thickness = thickness or 2, LineJoinMode = Enum.LineJoinMode.Round }, o)
+		o.TextStrokeTransparency = 1
 	end
 end
 
@@ -48,256 +58,223 @@ function Shape.get(gui)
 	return handles[gui]
 end
 
+-- opts = { radius=6, edge=Color3, thickness=2.5, fill=Color3, transparency, gradient=true, hover=true (buttons) }
 function Shape.apply(gui, opts)
 	opts = opts or {}
-	local existing = handles[gui]
-	if existing then
-		if opts.edge or opts.thickness then
-			existing.setEdge(opts.edge, opts.thickness)
+	local old = handles[gui]
+	if old then
+		if opts.edge then
+			old.setEdge(opts.edge, opts.thickness)
 		end
-		return existing
+		return old
 	end
-	clean(gui)
-	local c = math.max(opts.cut or 10, 2)
-	if gui:IsA("ViewportFrame") or gui:IsA("TextBox") then
-		-- children would cover a ViewportFrame's 3D render / a TextBox's typed text: keep it square, no pieces
-		local dummy = { cut = c }
-		function dummy.setFill() end
-		function dummy.setEdge() end
-		handles[gui] = dummy
-		return dummy
+	for _, ch in ipairs(gui:GetChildren()) do
+		if ch:IsA("UICorner") or ch:IsA("UIGradient") or (ch:IsA("UIStroke") and (ch.ApplyStrokeMode == Enum.ApplyStrokeMode.Border or not isText(gui))) then
+			ch:Destroy()
+		end
 	end
-	local fill = opts.fill or gui.BackgroundColor3
-	local tr = opts.transparency or gui.BackgroundTransparency
-	if tr >= 1 then
-		tr = 1 -- invisible background: keep only edges
+	if opts.fill then
+		gui.BackgroundColor3 = opts.fill
 	end
-	gui.BackgroundTransparency = 1
+	if opts.transparency then
+		gui.BackgroundTransparency = opts.transparency
+	end
 	gui.BorderSizePixel = 0
-
-	local box = new("Frame", { Name = "Shape", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 0 }, nil)
-	local base = UDim2.new()
-	local isSibling = false
-	local function goSibling()
-		-- gui lays out its children: a child box would become a layout cell, so draw behind it instead
-		if isSibling then
-			return
-		end
-		isSibling = true
-		local function follow()
-			box.AnchorPoint, box.Size, box.Visible = gui.AnchorPoint, gui.Size, gui.Visible
-			box.Position = gui.Position
-			box.ZIndex = gui.ZIndex - 1
-			base = gui.Position
-		end
-		follow()
-		for _, prop in ipairs({ "Position", "Size", "AnchorPoint", "Visible", "ZIndex" }) do
-			gui:GetPropertyChangedSignal(prop):Connect(follow)
-		end
-		gui.AncestryChanged:Connect(function()
-			if gui.Parent then
-				box.Parent = gui.Parent
-			else
-				box:Destroy()
-			end
-		end)
-		box.Parent = gui.Parent
+	local corner = new("UICorner", { CornerRadius = UDim.new(0, math.clamp(opts.radius or 6, Shape.MIN_RADIUS, Shape.MAX_RADIUS)) }, gui)
+	local stroke = new("UIStroke", {
+		Name = "Border", ApplyStrokeMode = Enum.ApplyStrokeMode.Border, LineJoinMode = Enum.LineJoinMode.Round,
+		Color = opts.edge or Shape.DEFAULT_EDGE, Thickness = math.clamp(opts.thickness or 2.5, 2, 3),
+	}, gui)
+	local isButton = gui:IsA("GuiButton")
+	if opts.gradient ~= false then
+		-- panels: subtle top-light vertical fade; buttons: stronger lighter top
+		local top = isButton and Color3.new(1, 1, 1) or Color3.fromRGB(255, 255, 255)
+		local bottom = isButton and Color3.fromRGB(175, 175, 175) or Color3.fromRGB(200, 200, 200)
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(top, bottom) }, gui)
 	end
-	if gui:FindFirstChildWhichIsA("UIGridStyleLayout") then
-		goSibling()
-	else
-		-- UIPadding would inset the box: stretch it back out to the real edges
-		local function pad()
-			if isSibling then
-				return
-			end
-			local p = gui:FindFirstChildOfClass("UIPadding")
-			if p then
-				base = UDim2.new(-p.PaddingLeft.Scale, -p.PaddingLeft.Offset, -p.PaddingTop.Scale, -p.PaddingTop.Offset)
-				box.Size = UDim2.new(1 + p.PaddingLeft.Scale + p.PaddingRight.Scale, p.PaddingLeft.Offset + p.PaddingRight.Offset,
-					1 + p.PaddingTop.Scale + p.PaddingBottom.Scale, p.PaddingTop.Offset + p.PaddingBottom.Offset)
-			else
-				base, box.Size = UDim2.new(), UDim2.fromScale(1, 1)
-			end
-			box.Position = base
-		end
-		pad()
-		gui.ChildAdded:Connect(function(ch)
-			if ch:IsA("UIPadding") and not isSibling then
-				task.defer(pad)
-			elseif ch:IsA("UIGridStyleLayout") then
-				goSibling()
-			end
-		end)
-		box.Parent = gui
-		-- text drawn by gui itself would sit UNDER child pieces: mirror it into a child label above them
-		if (gui:IsA("TextLabel") or gui:IsA("TextButton")) and tr < 1 then
-			local m = new("TextLabel", { Name = "ShapeText", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 1 }, gui)
-			local PROPS = { "Text", "TextColor3", "TextScaled", "TextSize", "Font", "TextXAlignment", "TextYAlignment",
-				"TextWrapped", "RichText", "TextStrokeTransparency", "TextStrokeColor3", "TextTruncate" }
-			for _, prop in ipairs(PROPS) do
-				m[prop] = gui[prop]
-				gui:GetPropertyChangedSignal(prop):Connect(function()
-					m[prop] = gui[prop]
-				end)
-			end
-			m.TextTransparency = gui.TextTransparency
-			gui.TextTransparency = 1
-			gui:GetPropertyChangedSignal("TextTransparency"):Connect(function()
-				if gui.TextTransparency ~= 1 then
-					m.TextTransparency = gui.TextTransparency
-					gui.TextTransparency = 1
-				end
-			end)
-			for _, ch in ipairs(gui:GetChildren()) do -- text outline strokes belong on the visible text
-				if ch:IsA("UIStroke") and ch.ApplyStrokeMode == Enum.ApplyStrokeMode.Contextual then
-					ch.Parent = m
-				end
-			end
-		end
-	end
-	local pieces, diamonds, edges = {}, {}, {}
-	local function piece(props)
-		props.BorderSizePixel = 0
-		props.BackgroundTransparency = tr
-		props.ZIndex = 0
-		local f = new("Frame", props, box)
-		table.insert(pieces, f)
-		return f
-	end
-	local grad = opts.gradient ~= false
-	local h = piece({ Name = "H", Position = UDim2.fromOffset(0, c), Size = UDim2.new(1, 0, 1, -2 * c) })
-	local v = piece({ Name = "V", Position = UDim2.fromOffset(c, 0), Size = UDim2.new(1, -2 * c, 1, 0) })
-	for _, p in ipairs({ { 0, c, 0, c, true }, { 1, -c, 0, c, true }, { 1, -c, 1, -c, false }, { 0, c, 1, -c, false } }) do
-		local d = piece({
-			Name = "D", AnchorPoint = Vector2.new(0.5, 0.5), Rotation = 45,
-			Position = UDim2.new(p[1], p[2], p[3], p[4]), Size = UDim2.fromOffset(c * SQRT2, c * SQRT2),
-		})
-		table.insert(diamonds, { f = d, top = p[5] })
-	end
-	if grad then
-		for _, f in ipairs({ h, v }) do
-			new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(185, 185, 195)) }, f)
-		end
+	if isText(gui) then
+		gui.TextStrokeColor3, gui.TextStrokeTransparency = Shape.OUTLINE, 0 -- Border stroke owns the UIStroke slot
 	end
 
-	-- crisp neon edges
-	local t = opts.thickness or 1.5
-	local function line(props)
-		props.BorderSizePixel = 0
-		props.ZIndex = 0
-		local f = new("Frame", props, box)
-		table.insert(edges, f)
-		return f
-	end
-	line({ Position = UDim2.fromOffset(c, 0), Size = UDim2.new(1, -2 * c, 0, t) })
-	line({ Position = UDim2.new(0, c, 1, -t), Size = UDim2.new(1, -2 * c, 0, t) })
-	line({ Position = UDim2.fromOffset(0, c), Size = UDim2.new(0, t, 1, -2 * c) })
-	line({ Position = UDim2.new(1, -t, 0, c), Size = UDim2.new(0, t, 1, -2 * c) })
-	for _, p in ipairs({ { 0, c / 2, 0, c / 2, -45 }, { 1, -c / 2, 0, c / 2, 45 }, { 1, -c / 2, 1, -c / 2, -45 }, { 0, c / 2, 1, -c / 2, 45 } }) do
-		line({
-			AnchorPoint = Vector2.new(0.5, 0.5), Rotation = p[5],
-			Position = UDim2.new(p[1], p[2], p[3], p[4]), Size = UDim2.fromOffset(c * SQRT2 + t, t),
-		})
-	end
-	if opts.highlight ~= false and tr < 1 then
-		new("Frame", { Name = "Highlight", BorderSizePixel = 0, ZIndex = 0, BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.82,
-			Position = UDim2.fromOffset(c, t + 2), Size = UDim2.new(1, -2 * c, 0, 1) }, box)
-	end
-
-	local handle = { box = box, cut = c }
-	local curFill, curEdge, curT = fill, opts.edge or Shape.DEFAULT_EDGE, t
-	function handle.setFill(col, transparency)
-		curFill = col or curFill
-		for _, f in ipairs(pieces) do
-			f.BackgroundColor3 = curFill
-			if transparency then
-				f.BackgroundTransparency = transparency
-			end
-		end
-		if grad then -- bottom diamonds match the gradient's darker end
-			for _, d in ipairs(diamonds) do
-				d.f.BackgroundColor3 = d.top and curFill or scaleColor(curFill, 0.74)
-			end
-		end
-	end
-	function handle.setEdge(col, thickness)
-		curEdge = col or curEdge
-		curT = thickness or curT
-		for _, e in ipairs(edges) do
-			e.BackgroundColor3 = curEdge
-		end
-	end
+	local handle = { box = gui, corner = corner, stroke = stroke }
+	local baseFill = gui.BackgroundColor3
+	local syncing = false
 	function handle.fill()
-		return curFill
+		return baseFill
 	end
-	handle.setFill(fill)
-	handle.setEdge(curEdge)
-	-- keep in sync if code later sets gui.BackgroundColor3 (e.g. button state colors)
+	function handle.setFill(col, tr)
+		if col then
+			baseFill = col
+			syncing = true
+			gui.BackgroundColor3 = col
+			syncing = false
+		end
+		if tr then
+			gui.BackgroundTransparency = tr
+		end
+	end
+	function handle.setEdge(col, t)
+		if col then
+			stroke.Color = col
+		end
+		if t then
+			stroke.Thickness = math.clamp(t, 2, 3)
+		end
+	end
 	gui:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
-		handle.setFill(gui.BackgroundColor3)
+		if not syncing then
+			baseFill = gui.BackgroundColor3
+		end
 	end)
-	-- corners/strokes added later by older call sites: corners dropped, border strokes become our edge
+	-- older call sites adding corners/border strokes later: fold them into ours
 	gui.ChildAdded:Connect(function(ch)
-		if ch:IsA("UICorner") then
+		if ch:IsA("UICorner") and ch ~= corner then
 			task.defer(ch.Destroy, ch)
-		elseif isBorderStroke(gui, ch) then
+		elseif ch:IsA("UIStroke") and ch ~= stroke and (ch.ApplyStrokeMode == Enum.ApplyStrokeMode.Border or not isText(gui)) then
 			task.defer(function()
-				handle.setEdge(ch.Color, math.clamp(ch.Thickness, 1, 2))
+				handle.setEdge(ch.Color, ch.Thickness)
 				ch:Destroy()
 			end)
 		end
 	end)
 
-	-- hover/press: brighten + 2px lift (buttons only)
-	if gui:IsA("GuiButton") and opts.hover ~= false then
+	if isButton and opts.hover ~= false then
 		gui.AutoButtonColor = false
+		local scale = gui:FindFirstChildOfClass("UIScale") or new("UIScale", {}, gui)
 		local hovering = false
-		local function show(k, dy)
-			local col = scaleColor(curFill, k)
-			for _, f in ipairs(pieces) do
-				TweenService:Create(f, QUICK, { BackgroundColor3 = col }):Play()
-			end
-			TweenService:Create(box, QUICK, { Position = base + UDim2.fromOffset(0, dy) }):Play()
+		local function show(bright, s)
+			syncing = true
+			TweenService:Create(gui, QUICK, { BackgroundColor3 = scaleColor(baseFill, bright) }):Play()
+			task.delay(QUICK.Time, function()
+				syncing = false
+			end)
+			TweenService:Create(scale, QUICK, { Scale = s }):Play()
 		end
 		gui.MouseEnter:Connect(function()
 			hovering = true
-			show(1.18, -2)
+			show(1.18, 1)
 		end)
 		gui.MouseLeave:Connect(function()
 			hovering = false
-			show(1, 0)
+			show(1, 1)
 		end)
 		gui.MouseButton1Down:Connect(function()
-			show(0.85, 1)
+			show(1.05, 0.95)
 		end)
 		gui.MouseButton1Up:Connect(function()
-			show(hovering and 1.18 or 1, hovering and -2 or 0)
+			show(hovering and 1.18 or 1, 1)
 		end)
 	end
 	handles[gui] = handle
 	return handle
 end
 
--- Sharp accent notch for headers: a bright slanted bar left of a title label.
-function Shape.accent(label, color)
-	local bar = new("Frame", {
-		Name = "Accent", BorderSizePixel = 0, BackgroundColor3 = color or Shape.DEFAULT_EDGE,
-		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(0, -6, 0.5, 0), Size = UDim2.new(0, 4, 0.8, 0),
-		Rotation = 12, ZIndex = label.ZIndex,
-	}, label)
-	return bar
+-- Colored glow (cards only): soft rings OUTSIDE the card edge (transparent frames with fading
+-- strokes), so nothing tints the card face and it works inside layouts.
+function Shape.glow(card, color)
+	local holder = new("Frame", { Name = "Glow", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 0 }, card)
+	for i, spec in ipairs({ { 3, 3, 0.45 }, { 6, 3, 0.7 }, { 9, 3, 0.86 } }) do
+		local g = new("Frame", {
+			Name = "Halo" .. i, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, spec[1] * 2, 1, spec[1] * 2), ZIndex = 0,
+		}, holder)
+		new("UICorner", { CornerRadius = UDim.new(0, 8 + spec[1]) }, g)
+		new("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = color, Thickness = spec[2], Transparency = spec[3] }, g)
+	end
+	return holder
 end
 
--- Empty, sized icon slot (real images drop in later via slot.Image). Keeps layouts stable.
--- Hover tooltip (name of a blank icon slot etc). Sharp dark plate with a neon edge, above the target.
+-- Slanted brush-stroke title banner (Anime Origins style) hanging over the panel's top-left corner.
+-- Orange -> cream gradient, rotated -5deg, ragged ends from small offset/rotated slices, white
+-- sparkle at the left tip, heavy italic white outlined text. Returns { root, label }.
+Shape.BANNER_FROM = Color3.fromRGB(255, 120, 30)
+Shape.BANNER_TO = Color3.fromRGB(255, 236, 196)
+function Shape.banner(panel, text, opts)
+	opts = opts or {}
+	local w, h = opts.width or math.max(180, #text * 17 + 70), opts.height or 46
+	local from, to = opts.from or Shape.BANNER_FROM, opts.to or Shape.BANNER_TO
+	local z = (panel.ZIndex or 1) + 5
+	local root = new("Frame", {
+		Name = "TitleBanner", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromOffset(-18, 2), Size = UDim2.fromOffset(w, h), Rotation = -5, ZIndex = z,
+	}, panel)
+	local grad = ColorSequence.new(from, to)
+	local function stroke(props)
+		props.BorderSizePixel, props.ZIndex = 0, props.ZIndex or z
+		local f = new("Frame", props, root)
+		new("UIGradient", { Color = grad }, f)
+		return f
+	end
+	-- main body, slightly narrower than the banner so the ragged slices make the ends
+	stroke({ Name = "Body", BackgroundColor3 = Color3.new(1, 1, 1), Position = UDim2.fromOffset(14, 4), Size = UDim2.new(1, -30, 1, -8) })
+	-- ragged ends: short skewed slices of varying length/offset (left uses the FROM end of the gradient)
+	local slices = { { -2, 0.0, 0.22, -7 }, { 4, 0.2, 0.2, 5 }, { -6, 0.38, 0.24, -3 }, { 2, 0.6, 0.2, 8 }, { -4, 0.78, 0.2, -6 } }
+	for i, s in ipairs(slices) do
+		local l = new("Frame", {
+			Name = "RagL" .. i, BorderSizePixel = 0, BackgroundColor3 = scaleColor(from, 1), ZIndex = z,
+			Position = UDim2.new(0, 8 + s[1], s[2], 2), Size = UDim2.new(0, 22, s[3], 0), Rotation = s[4],
+		}, root)
+		local r = new("Frame", {
+			Name = "RagR" .. i, BorderSizePixel = 0, BackgroundColor3 = to, ZIndex = z,
+			Position = UDim2.new(1, -30 - s[1], s[2], 2), Size = UDim2.new(0, 22 - i % 2 * 6, s[3], 0), Rotation = -s[4],
+		}, root)
+		local _ = l, r
+	end
+	-- thin dry-brush streaks off the right end
+	for i, s in ipairs({ { 0.18, 18, 3 }, { 0.5, 26, 2 }, { 0.74, 14, 3 } }) do
+		new("Frame", { Name = "Streak" .. i, BorderSizePixel = 0, BackgroundColor3 = to, BackgroundTransparency = 0.15, ZIndex = z,
+			Position = UDim2.new(1, -12, s[1], 0), Size = UDim2.fromOffset(s[2], s[3]) }, root)
+	end
+	-- sparkle at the left tip: two crossed thin rects + a small rotated square core
+	local sp = new("Frame", { Name = "Sparkle", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0, 6, 0.5, 0), Size = UDim2.fromOffset(28, 28), ZIndex = z + 2 }, root)
+	new("Frame", { BorderSizePixel = 0, BackgroundColor3 = Color3.new(1, 1, 1), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, 0, 0, 3), ZIndex = z + 2 }, sp)
+	new("Frame", { BorderSizePixel = 0, BackgroundColor3 = Color3.new(1, 1, 1), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0, 3, 1, 0), ZIndex = z + 2 }, sp)
+	new("Frame", { BorderSizePixel = 0, BackgroundColor3 = Color3.new(1, 1, 1), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(8, 8), Rotation = 45, ZIndex = z + 2 }, sp)
+	local label = new("TextLabel", {
+		Name = "Title", Text = text, BackgroundTransparency = 1, TextColor3 = Color3.new(1, 1, 1), TextScaled = true,
+		FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy, Enum.FontStyle.Italic),
+		TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.fromOffset(30, 6), Size = UDim2.new(1, -48, 1, -12), ZIndex = z + 1,
+	}, root)
+	new("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Color = Shape.OUTLINE, Thickness = 2.5, LineJoinMode = Enum.LineJoinMode.Round }, label)
+	return { root = root, label = label }
+end
+
+-- KeyCode name -> short chip text.
+local SHORT = { One = "1", Two = "2", Three = "3", Four = "4", Five = "5", Six = "6", Seven = "7", Eight = "8", Nine = "9", Zero = "0",
+	LeftShift = "Shift", RightShift = "Shift", LeftControl = "Ctrl", RightControl = "Ctrl", Space = "Space", Tab = "Tab" }
+function Shape.keyText(name)
+	return name and (SHORT[name] or name) or nil
+end
+
+-- Small dark rounded keybind chip in a button's top-left corner. getKey() -> KeyCode name | nil;
+-- call the returned refresh() on rebind. Hidden when there is no key.
+function Shape.keyChip(button, getKey)
+	local chip = new("TextLabel", {
+		Name = "KeyChip", BackgroundColor3 = Color3.fromRGB(16, 12, 10), BackgroundTransparency = 0.1, TextColor3 = Color3.new(1, 1, 1),
+		Font = Enum.Font.GothamBlack, TextScaled = true, Position = UDim2.fromOffset(3, 3), Size = UDim2.fromOffset(20, 18),
+		ZIndex = (button.ZIndex or 1) + 3,
+	}, button)
+	new("UICorner", { CornerRadius = UDim.new(0, 4) }, chip)
+	new("UIPadding", { PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 3), PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 2) }, chip)
+	local function refresh()
+		local t = Shape.keyText(getKey())
+		chip.Visible = t ~= nil and t ~= ""
+		chip.Text = t or ""
+		chip.Size = UDim2.fromOffset(math.max(20, #chip.Text * 8 + 8), 18)
+	end
+	refresh()
+	return chip, refresh
+end
+
+-- Hover tooltip (names a blank icon slot etc).
 function Shape.tooltip(target, text, edge)
 	local tip = new("TextLabel", {
-		Name = "Tip", Text = text, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0, -4),
-		Size = UDim2.fromOffset(math.max(56, #text * 7 + 14), 18), BackgroundColor3 = Color3.fromRGB(10, 8, 20),
-		TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 12, Visible = false, ZIndex = 20,
+		Name = "Tip", Text = text, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0, -6),
+		Size = UDim2.fromOffset(math.max(56, #text * 7 + 16), 20), BackgroundColor3 = Color3.fromRGB(18, 14, 12),
+		TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 12, Visible = false, ZIndex = 30,
 	}, target)
-	Shape.apply(tip, { cut = 4, edge = edge or Shape.DEFAULT_EDGE, thickness = 1 })
+	Shape.apply(tip, { radius = 4, edge = edge or Shape.DEFAULT_EDGE, thickness = 2, gradient = false })
 	target.MouseEnter:Connect(function()
 		tip.Visible = true
 	end)
@@ -313,6 +290,23 @@ function Shape.iconSlot(props, parent)
 		s[k] = v
 	end
 	return s
+end
+
+-- Global text pass: bold rounded fonts + dark outline on every text object under `root`, now and later.
+local SWAP = { [Enum.Font.Gotham] = Enum.Font.GothamBold, [Enum.Font.GothamMedium] = Enum.Font.GothamBold, [Enum.Font.SourceSans] = Enum.Font.GothamBold, [Enum.Font.Legacy] = Enum.Font.GothamBold }
+function Shape.styleText(root)
+	local function one(o)
+		if isText(o) then
+			if SWAP[o.Font] then
+				o.Font = SWAP[o.Font]
+			end
+			task.defer(Shape.outlineText, o) -- after the creator finishes adding its own strokes
+		end
+	end
+	for _, d in ipairs(root:GetDescendants()) do
+		one(d)
+	end
+	root.DescendantAdded:Connect(one)
 end
 
 return Shape

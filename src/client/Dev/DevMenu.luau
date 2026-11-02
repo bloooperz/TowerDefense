@@ -17,14 +17,14 @@ local Placement = require(script.Parent.Parent.Placement)
 local log = Log.new("DevMenu")
 local DevMenu = {}
 local Input = require(script.Parent.Parent.Input) -- "dev" action, default F2
-local BG, ROW = Color3.fromRGB(28, 28, 36), Color3.fromRGB(45, 45, 58)
+local BG, ROW = Theme.World.BASE, Theme.World.BASE_2
 
 local function btn(text, color, parent, order)
 	local b = Theme.make("TextButton", {
 		Text = text, Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = Color3.new(1, 1, 1),
 		BackgroundColor3 = color or ROW, Size = UDim2.new(1, 0, 0, 28), LayoutOrder = order, AutoButtonColor = true,
 	}, parent)
-	Theme.round(b, 6)
+	Theme.button(b, color or ROW)
 	return b
 end
 
@@ -94,10 +94,9 @@ local function build()
 	corner.AnchorPoint, corner.Position, corner.Size = Vector2.new(1, 1), UDim2.new(1, -8, 1, -8), UDim2.fromOffset(52, 28)
 
 	local frame = Theme.make("Frame", { Size = UDim2.fromOffset(300, 470), Position = UDim2.new(1, -320, 0, 80), BackgroundColor3 = BG, Visible = false }, gui)
-	Theme.round(frame, 10)
-	Theme.stroke(frame, 2, Color3.fromRGB(255, 60, 90))
+	Theme.panel(frame, Theme.World.RED)
 	local title = Theme.make("TextLabel", { Text = "  DEV MENU (Studio)  [F2]", Font = Enum.Font.GothamBlack, TextSize = 15, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = Color3.fromRGB(200, 40, 60), Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, Active = true }, frame)
-	Theme.round(title, 10)
+	Theme.round(title, 8)
 	draggable(title, frame)
 	local body = Theme.make("ScrollingFrame", { Position = UDim2.fromOffset(8, 38), Size = UDim2.new(1, -16, 1, -46), BackgroundTransparency = 1, ScrollBarThickness = 4, AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new() }, frame)
 	Theme.make("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }, body)

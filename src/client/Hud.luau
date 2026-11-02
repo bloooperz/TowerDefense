@@ -107,7 +107,7 @@ function Hud.init(cashValue)
 		TextColor3 = Color3.new(1, 1, 1),
 		Visible = false,
 	}, ui.top)
-	Style.shape(ui.vote, 10)
+	Style.button(ui.vote, Style.GREEN)
 	Style.make("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, ui.vote)
 	ui.vote.MouseButton1Click:Connect(function()
 		if Hud.onVote then

@@ -1,11 +1,10 @@
 -- Rounded glowing icon button: icon, outlined title, shortcut letter, optional "New!" tag.
--- opts = { name, icon, color, key?, isNew?, size?, onClick }
-local TweenService = game:GetService("TweenService")
+-- opts = { name, color, keyAction? (Keybinds id), isNew?, size?, onClick }
 local Theme = require(script.Parent.Theme)
+local Input = require(script.Parent.Parent.Input)
 local Log = require(game:GetService("ReplicatedStorage").Shared.Log)
 
 local Button = {}
-local QUICK = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 function Button.new(opts, parent)
 	local size = opts.size or 84
@@ -20,41 +19,21 @@ function Button.new(opts, parent)
 		Text = "",
 		ZIndex = 2,
 	}, holder)
-	Theme.round(b, 16)
-	Theme.stroke(b, 3)
-	Theme.gloss(b)
-	local scale = Theme.make("UIScale", { Scale = 1 }, b)
-	Theme.glow(b, opts.color, 4).Name = "Glow"
+	Theme.button(b, opts.color) -- bright solid fill, lighter top, darker stroke, hover/press in Shape
 	-- blank icon slot (real art drops in later); label underneath names the button
 	Theme.shape.iconSlot({ Name = "Icon", Size = UDim2.fromScale(0.5, 0.46), Position = UDim2.fromScale(0.25, 0.12), ZIndex = 3 }, b)
-	Theme.label({ Text = opts.name, Size = UDim2.new(1, -6, 0.26, 0), Position = UDim2.new(0, 3, 0.68, 0), ZIndex = 3 }, b)
-	if opts.key then
-		local k = Theme.label({ Text = opts.key, Size = UDim2.fromOffset(20, 20), Position = UDim2.fromOffset(4, 3), ZIndex = 4, BackgroundTransparency = 0.3, BackgroundColor3 = Theme.OUTLINE }, b)
-		Theme.round(k, 6)
+	Theme.label({ Text = opts.name, Font = Theme.FONT, Size = UDim2.new(1, -6, 0.26, 0), Position = UDim2.new(0, 3, 0.68, 0), ZIndex = 3 }, b)
+	if opts.keyAction then
+		-- keybind chip from Input/Keybinds; follows rebinds, hidden when unbound
+		local _, refresh = Theme.shape.keyChip(b, function()
+			return Input.keyFor(opts.keyAction)
+		end)
+		Input.onChanged(refresh)
 	end
 	if opts.isNew then
-		local tag = Theme.label({ Text = "New!", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 8, 0, -8), Size = UDim2.fromOffset(44, 20), Rotation = 12, ZIndex = 5, BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(230, 30, 40) }, b)
-		Theme.round(tag, 6)
-		Theme.stroke(tag, 2)
+		local tag = Theme.label({ Text = "New!", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 8, 0, -8), Size = UDim2.fromOffset(44, 20), Rotation = 12, ZIndex = 5, BackgroundTransparency = 0, BackgroundColor3 = Theme.World.RED }, b)
+		Theme.button(tag, Theme.World.RED)
 	end
-	local function to(s)
-		TweenService:Create(scale, QUICK, { Scale = s }):Play()
-	end
-	local hovering = false
-	b.MouseEnter:Connect(function()
-		hovering = true
-		to(1.08)
-	end)
-	b.MouseLeave:Connect(function()
-		hovering = false
-		to(1)
-	end)
-	b.MouseButton1Down:Connect(function()
-		to(0.92)
-	end)
-	b.MouseButton1Up:Connect(function()
-		to(hovering and 1.08 or 1)
-	end)
 	b.Activated:Connect(function()
 		if opts.onClick then
 			Log.try("UI", "button " .. opts.name, opts.onClick)
