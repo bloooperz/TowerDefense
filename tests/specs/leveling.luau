@@ -13,24 +13,25 @@ return function(t)
 	end
 
 	-- damage curve
-	t.test("damage mult: L1 = 1x, L80 ~ 60x", function()
-		t.near(UL.damageMult(1), 1); close(UL.damageMult(80), 60, 0.01)
-		close(UL.damageMult(10), 3.25, 0.01); close(UL.damageMult(40), 19.07, 0.01)
+	t.test("damage mult: L1 = 1x, L60 ~ 3.94x, L80 ~ 5.14x (Vanguards curve)", function()
+		t.near(UL.damageMult(1), 1); close(UL.damageMult(60), 3.94, 0.03); close(UL.damageMult(80), 5.14, 0.01)
+		close(148 * UL.damageMult(60), 583, 2); close(214.8 * UL.damageMult(60), 847.2, 2)
+		close(48.6 * UL.damageMult(80), 250, 1)
 	end)
 	t.test("damage mult strictly increasing and clamped", function()
 		for l = 2, 80 do
 			assert(UL.damageMult(l) > UL.damageMult(l - 1), "not monotonic at " .. l)
 		end
-		t.eq(UL.damageMult(0), 1); close(UL.damageMult(200), 60, 0.01)
+		t.eq(UL.damageMult(0), 1); close(UL.damageMult(200), 5.14, 0.01)
 		-- early levels meaningful: L2 at least +0.15x
-		assert(UL.damageMult(2) - 1 > 0.15)
+		assert(UL.damageMult(2) - 1 > 0.005)
 	end)
 	t.test("applyDamage: damage only, sandbox override absolute", function()
 		local st = { damage = 1, range = 10, rate = 1 }
 		local o = UL.applyDamage(st, 80)
-		close(o.damage, 60, 0.01); t.eq(o.range, 10); t.eq(o.rate, 1); t.eq(st.damage, 1)
+		close(o.damage, 5.14, 0.01); t.eq(o.range, 10); t.eq(o.rate, 1); t.eq(st.damage, 1)
 		t.eq(UL.applyDamage(st, 80, { damage = 5 }).damage, 1) -- override already resolved upstream
-		close(UL.applyDamage(st, 80, { damage = 0 }).damage, 60, 0.01)
+		close(UL.applyDamage(st, 80, { damage = 0 }).damage, 5.14, 0.01)
 	end)
 
 	-- XP curves

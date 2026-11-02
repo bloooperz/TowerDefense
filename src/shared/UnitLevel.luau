@@ -3,9 +3,9 @@
 -- in-match upgrade tiers in UnitStats. Account level scales DAMAGE ONLY (never rate/range).
 --
 -- Damage multiplier (t = (L - 1) / 79, L clamped to 1..80):
---     mult(L) = 1 + 59 * (0.25 * t + 0.75 * t^2)
---   L1 = 1.00x, L10 = 3.25x, L20 = 7.11x, L40 = 19.07x, L60 = 36.70x, L80 = 60.00x
---   (linear quarter keeps early levels noticeable; the quadratic part is the payoff near 80)
+--     mult(L) = 1 + 4.14 * t^1.1725      (Anime Vanguards-style, ~4x by L60)
+--   L1 = 1.00x, L10 = 1.32x, L20 = 1.78x, L30 = 2.28x, L40 = 2.81x, L50 = 3.37x,
+--   L60 = 3.94x, L70 = 4.53x, L80 = 5.14x   (48.6 base -> ~191.5 at L60, ~250 at L80)
 --
 -- XP to go from L to L + 1 (xp is stored as progress INTO the current level):
 --     xpToNext(L) = 100 + 20 * (L - 1) + (L - 1)^2      (L1 -> 100, L40 -> 2401, L79 -> 7744)
@@ -13,7 +13,9 @@
 local UnitLevel = {}
 
 UnitLevel.MAX = 80
-UnitLevel.MAX_MULT = 60
+UnitLevel.MAX_MULT = 5.14 -- = 1 + CURVE_A
+UnitLevel.CURVE_A = 4.14
+UnitLevel.CURVE_P = 1.1725
 
 function UnitLevel.clampLevel(level: number?): number
 	local l = math.floor(tonumber(level) or 1)
@@ -22,7 +24,7 @@ end
 
 function UnitLevel.damageMult(level: number?): number
 	local t = (UnitLevel.clampLevel(level) - 1) / (UnitLevel.MAX - 1)
-	return 1 + (UnitLevel.MAX_MULT - 1) * (0.25 * t + 0.75 * t * t)
+	return 1 + UnitLevel.CURVE_A * t ^ UnitLevel.CURVE_P
 end
 
 -- Apply the account multiplier to resolved stats (copy). A sandbox damage override (> 0)
