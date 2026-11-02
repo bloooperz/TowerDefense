@@ -54,6 +54,7 @@ function Placement.init(cash)
 	screen.Parent = player:WaitForChild("PlayerGui")
 	local function label(color, y)
 		local l = Instance.new("TextLabel")
+		l.Text = ""
 		l.BackgroundTransparency, l.TextScaled, l.Font = 1, true, Enum.Font.GothamBlack
 		l.TextColor3, l.Size, l.Position = color, UDim2.fromOffset(220, 22), UDim2.fromOffset(0, y)
 		l.TextXAlignment = Enum.TextXAlignment.Left

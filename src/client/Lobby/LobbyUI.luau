@@ -8,6 +8,7 @@ local Shared = RS:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Units = require(Shared.Units)
 local PlayerLevel = require(Shared.PlayerLevel)
+local LoadoutView = require(Shared.LoadoutView)
 local Net = require(Shared.Net)
 local Log = require(Shared.Log)
 local UI = script.Parent.Parent.UI
@@ -19,6 +20,15 @@ local MapSelect = require(script.Parent.Parent.MapSelect)
 local LobbyFeatures = require(Shared.LobbyFeatures)
 
 local log = Log.new("Lobby")
+-- Stale-sync guard: a missing function here means an out-of-date local copy (Studio error
+-- "attempt to call a nil value" at the level bar). Fall back to level 1 instead of erroring.
+local progressFn = PlayerLevel.progress
+if type(progressFn) ~= "function" then
+	log.error("PlayerLevel.progress is missing: src/shared/PlayerLevel.luau is STALE (git pull / re-sync Rojo). Level bar shows Level 1.")
+	progressFn = function()
+		return 1, 0, 100
+	end
+end
 local player = Players.LocalPlayer
 local LobbyUI = {}
 
@@ -138,19 +148,14 @@ local function rebuildHotbar()
 			ch:Destroy()
 		end
 	end
-	local ids, levels = {}, {}
-	for id in string.gmatch(player:GetAttribute("Loadout") or "", "[^,]+") do
-		table.insert(ids, id)
-	end
-	for l in string.gmatch(player:GetAttribute("LoadoutLevels") or "", "[^,]+") do
-		table.insert(levels, tonumber(l) or 1)
-	end
-	for i = 1, Config.LOADOUT_SIZE do
-		local u = ids[i] and Units.get(ids[i])
-		if ids[i] and not u then
-			log.warn("loadout slot", i, "has unknown unit", ids[i])
+	-- before Loadout replicates: starter units, "Lv 1", grey R6 placeholder portraits
+	local slots = LoadoutView.slots(player:GetAttribute("Loadout"), player:GetAttribute("LoadoutLevels"), Config.STARTER_LOADOUT, Config.LOADOUT_SIZE)
+	for i, s in ipairs(slots) do
+		local u = s.id and Units.get(s.id)
+		if s.id and not u then
+			log.warn("loadout slot", i, "has unknown unit", s.id)
 		end
-		local ok, card = Log.try("Lobby", "card " .. tostring(ids[i]), Card.new, u, levels[i] or 1, hotbar)
+		local ok, card = Log.try("Lobby", "card " .. tostring(s.id), Card.new, u, s.level, hotbar, s.loading)
 		if ok then
 			card.LayoutOrder = i
 		end
@@ -162,14 +167,18 @@ local function levelBar(parent)
 	Theme.panel(bg)
 	levelFill = Theme.make("Frame", { Size = UDim2.fromScale(0, 1) }, bg)
 	Theme.button(levelFill, Theme.World.YELLOW)
-	levelText = Theme.label({ Size = UDim2.new(1, 0, 1, -4), Position = UDim2.fromOffset(0, 2), ZIndex = 3 }, bg)
+	-- default until Xp replicates: "Level 1 [0/N]", empty fill
+	local text0 = LoadoutView.levelBar(nil, progressFn)
+	levelText = Theme.label({ Text = text0, Size = UDim2.new(1, 0, 1, -4), Position = UDim2.fromOffset(0, 2), ZIndex = 3 }, bg)
 	local function upd()
-		local l, into, need = PlayerLevel.progress(player:GetAttribute("Xp") or 0)
-		levelFill.Size = UDim2.fromScale(need > 0 and math.clamp(into / need, 0, 1) or 1, 1)
-		levelText.Text = need > 0 and ("Level %d [%d/%d]"):format(l, into, need) or ("Level %d [MAX]"):format(l)
+		local text, frac = LoadoutView.levelBar(player:GetAttribute("Xp"), progressFn)
+		levelFill.Size = UDim2.fromScale(frac, 1)
+		levelText.Text = text
 	end
-	player:GetAttributeChangedSignal("Xp"):Connect(upd)
-	upd()
+	player:GetAttributeChangedSignal("Xp"):Connect(function()
+		Log.try("Lobby", "levelBar", upd)
+	end)
+	Log.try("Lobby", "levelBar", upd)
 end
 
 function LobbyUI.init()

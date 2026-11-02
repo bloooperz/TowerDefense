@@ -5,6 +5,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
+local Log = require(Shared.Log)
 local MyUnits = require(script.Parent.MyUnits)
 local Style = require(script.Parent.Style)
 local Theme = require(script.Parent.UI.Theme)
@@ -72,6 +73,7 @@ local function rebuild()
 			end
 		end)
 		local c = Instance.new("TextLabel")
+		c.Text = "0/" .. UnitStats.maxPlaced(u)
 		c.AnchorPoint, c.Position, c.Size = Vector2.new(1, 0), UDim2.new(1, -4, 0, 2), UDim2.fromOffset(34, 16)
 		c.BackgroundTransparency, c.TextScaled, c.Font = 1, true, Enum.Font.GothamBlack
 		c.TextColor3 = Color3.fromRGB(200, 200, 210)
@@ -79,7 +81,7 @@ local function rebuild()
 		counts[i], slots[i] = c, stroke
 		b.Parent = bar
 	end
-	Hotbar.refreshCounts()
+	Log.try("Hotbar", "refreshCounts", Hotbar.refreshCounts)
 end
 
 function Hotbar.init()
@@ -101,7 +103,7 @@ function Hotbar.init()
 	task.spawn(function()
 		while true do
 			if bar.Visible then
-				Hotbar.refreshCounts()
+				Log.try("Hotbar", "refreshCounts", Hotbar.refreshCounts)
 			end
 			task.wait(0.3)
 		end
@@ -130,7 +132,7 @@ end
 
 function Hotbar.setState(s)
 	Hotbar.bar.Visible = (s ~= "lobby")
-	Hotbar.refreshCounts()
+	Log.try("Hotbar", "refreshCounts", Hotbar.refreshCounts)
 end
 
 return Hotbar

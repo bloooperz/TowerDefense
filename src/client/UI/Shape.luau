@@ -13,6 +13,9 @@ local handles = setmetatable({}, { __mode = "k" })
 
 local function new(class, props, parent)
 	local o = Instance.new(class)
+	if o:IsA("TextLabel") or o:IsA("TextButton") or o:IsA("TextBox") then
+		o.Text = "" -- never show Roblox's default "Label"/"Button"/"TextBox"
+	end
 	for k, v in pairs(props or {}) do
 		o[k] = v
 	end

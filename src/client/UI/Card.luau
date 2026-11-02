@@ -6,8 +6,7 @@ local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
 local Card = {}
 
--- Same cube (+ optional topper) the server builds in Towers.place, at the origin.
-function Card.portrait(u, parent)
+local function viewport(parent)
 	local vp = Theme.make("ViewportFrame", {
 		BackgroundColor3 = Theme.Unit.BASE_2,
 		Ambient = Color3.fromRGB(150, 150, 150),
@@ -16,6 +15,38 @@ function Card.portrait(u, parent)
 	}, parent)
 	local cam = Theme.make("Camera", {}, vp)
 	vp.CurrentCamera = cam
+	return vp, cam
+end
+
+-- Loading portrait: blank neutral grey R6 block figure (head, torso, arms, legs), shown until
+-- the player's real unit data arrives (Anime Last Stand-style loading silhouette).
+Card.PLACEHOLDER_COLOR = Color3.fromRGB(150, 150, 156)
+function Card.placeholder(parent)
+	local vp, cam = viewport(parent)
+	vp.Name = "PlaceholderPortrait"
+	local model = Theme.make("Model", { Name = "R6Placeholder" }, vp)
+	local grey = Card.PLACEHOLDER_COLOR
+	local function part(name, size, pos)
+		Theme.make("Part", { Name = name, Anchored = true, Size = size, CFrame = CFrame.new(pos), Color = grey, Material = Enum.Material.SmoothPlastic }, model)
+	end
+	part("Head", Vector3.new(1.2, 1, 1), Vector3.new(0, 2, 0))
+	part("Torso", Vector3.new(2, 2, 1), Vector3.new(0, 0.5, 0))
+	part("Left Arm", Vector3.new(1, 2, 1), Vector3.new(-1.5, 0.5, 0))
+	part("Right Arm", Vector3.new(1, 2, 1), Vector3.new(1.5, 0.5, 0))
+	part("Left Leg", Vector3.new(1, 2, 1), Vector3.new(-0.5, -1.5, 0))
+	part("Right Leg", Vector3.new(1, 2, 1), Vector3.new(0.5, -1.5, 0))
+	cam.CFrame = CFrame.lookAt(Vector3.new(2.6, 1.4, 5.2), Vector3.new(0, 0.3, 0))
+	return vp
+end
+
+-- Same cube (+ optional topper) the server builds in Towers.place, at the origin.
+-- u == nil -> loading placeholder.
+function Card.portrait(u, parent)
+	if not u then
+		return Card.placeholder(parent)
+	end
+	local vp, cam = viewport(parent)
+	vp.Name = "Portrait"
 	local model = Theme.make("Model", {}, vp)
 	Theme.make("Part", { Anchored = true, Size = Vector3.one * u.size, CFrame = CFrame.new(), Color = u.color or Color3.new(1, 1, 1) }, model)
 	if u.topper then
@@ -37,8 +68,10 @@ local function badge(word, rim, parent, order)
 	return b
 end
 
--- u: unit def or nil (empty slot). level: number.
-function Card.new(u, level, parent)
+-- u: unit def or nil (empty slot). level: number (defaults to 1).
+-- loading = true: data not replicated yet -> grey R6 placeholder portrait (still "Lv 1").
+function Card.new(u, level, parent, loading)
+	level = level or 1
 	local rarity = u and Config.RARITY_COLORS[u.rarity or "Common"] or Theme.Unit.BORDER
 	local c = Theme.make("Frame", { Size = UDim2.fromOffset(86, 104), ZIndex = 2 }, parent)
 	-- unit palette: neutral charcoal, rarity-colored border + glow (glow is cards-only)
@@ -50,7 +83,7 @@ function Card.new(u, level, parent)
 		Theme.label({ Text = "+", Size = UDim2.fromScale(0.5, 0.5), Position = UDim2.fromScale(0.25, 0.25), TextTransparency = 0.5, ZIndex = 3 }, c)
 		return c
 	end
-	local vp = Card.portrait(u, c)
+	local vp = loading and Card.placeholder(c) or Card.portrait(u, c)
 	vp.Size, vp.Position, vp.ZIndex = UDim2.new(1, -8, 0, 62), UDim2.fromOffset(4, 4), 3
 	Shape.apply(vp, { radius = 6, edge = Theme.Unit.BORDER, thickness = 2, gradient = false })
 	Theme.label({ Text = "Lv " .. level, Size = UDim2.fromOffset(40, 14), Position = UDim2.fromOffset(6, 6), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 }, c)

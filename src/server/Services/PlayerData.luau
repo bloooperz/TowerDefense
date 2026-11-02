@@ -55,6 +55,14 @@ local function mockStore()
 	}
 end
 
+-- Stale-sync guard: every PlayerLevel function load/replicate needs must exist, else the local
+-- copy of src/shared/PlayerLevel.luau is out of date (would surface as "attempt to call a nil value").
+for _, fn in ipairs({ "levelForXp", "check", "progress" }) do
+	if type((PlayerLevel :: any)[fn]) ~= "function" then
+		log.error(("PlayerLevel.%s is missing: src/shared/PlayerLevel.luau is STALE (git pull / re-sync Rojo)"):format(fn))
+	end
+end
+
 local store
 do
 	local ok, res = pcall(function()

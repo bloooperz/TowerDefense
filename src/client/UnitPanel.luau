@@ -36,6 +36,9 @@ local GREY = Color3.fromRGB(70, 70, 80)
 
 local function make(class, props, parent)
 	local o = Instance.new(class)
+	if o:IsA("TextLabel") or o:IsA("TextButton") or o:IsA("TextBox") then
+		o.Text = "" -- never show Roblox's default "Label"/"Button"/"TextBox"
+	end
 	for k, v in pairs(props) do
 		o[k] = v
 	end
