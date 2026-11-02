@@ -7,6 +7,7 @@ local Maps = require(Shared.Maps)
 local Modes = require(Shared.Modes)
 local Net = require(Shared.Net)
 local Style = require(script.Parent.Style)
+local Panel = require(script.Parent.UI.Panel)
 
 local MapSelect = {}
 local root, titleLabel, startBtn, mapsCol, modesCol
@@ -50,6 +51,14 @@ local function column(title, x, parent)
 end
 
 function MapSelect.init()
+	MapSelect.panel = Panel.register({
+		open = function()
+			root.Visible = true
+		end,
+		close = function()
+			root.Visible = false
+		end,
+	})
 	local screen = Style.make("ScreenGui", { Name = "MapSelect", ResetOnSpawn = false, DisplayOrder = 20 }, Players.LocalPlayer:WaitForChild("PlayerGui"))
 	root = Style.panel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(520, 360), Visible = false }, screen)
 	titleLabel = Style.text({ Text = "Choose a map", Size = UDim2.new(1, 0, 0, 36), Position = UDim2.fromOffset(0, 8) }, root)
@@ -84,13 +93,13 @@ function MapSelect.init()
 		elseif chosenMap and chosenMode then
 			Net.send("ChooseMap", chosenMap, chosenMode)
 		end
-		root.Visible = false
+		MapSelect.panel.close()
 	end)
 	local cancel = button("Cancel", root, 0)
 	cancel.AnchorPoint, cancel.Position, cancel.Size = Vector2.new(0, 1), UDim2.new(0, 12, 1, -12), UDim2.fromOffset(120, 44)
 	cancel.BackgroundColor3 = Style.GREY
 	cancel.MouseButton1Click:Connect(function()
-		root.Visible = false
+		MapSelect.panel.close()
 	end)
 	-- payload: { kind = "pick" } or { kind = "join", mapName, modeName, players }
 	Net.listen("OpenMapSelect", function(p)
@@ -100,10 +109,10 @@ function MapSelect.init()
 		titleLabel.Text = join and ("Join %s (%s)? %d in lobby"):format(p.mapName or "?", p.modeName or "?", p.players or 0)
 			or "Choose a map"
 		startBtn.Text = join and "Join" or "Start"
-		root.Visible = true
+		MapSelect.panel.open() -- one-panel manager closes any lobby panel
 	end)
 	Net.listen("MatchState", function()
-		root.Visible = false
+		MapSelect.panel.close()
 	end)
 end
 

@@ -18,8 +18,8 @@ World.part = part
 
 local function billboard(adornee, text, size)
 	local g = Instance.new("BillboardGui")
-	g.Size, g.StudsOffsetWorldSpace, g.AlwaysOnTop = size or UDim2.fromOffset(250, 60), Vector3.new(0, 6, 0), true
-	g.MaxDistance = 300
+	g.Size, g.StudsOffsetWorldSpace, g.AlwaysOnTop = size or UDim2.fromOffset(250, 60), Vector3.new(0, 6, 0), false
+	g.MaxDistance = 120 -- not AlwaysOnTop: never draws through walls/UI
 	g.Parent = adornee
 	local l = Instance.new("TextLabel")
 	l.Size, l.BackgroundTransparency, l.TextScaled = UDim2.fromScale(1, 1), 1, true

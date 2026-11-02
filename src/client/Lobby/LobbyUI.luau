@@ -15,6 +15,7 @@ local Theme = require(UI.Theme)
 local Button = require(UI.Button)
 local Panel = require(UI.Panel)
 local Card = require(UI.Card)
+local MapSelect = require(script.Parent.Parent.MapSelect)
 
 local log = Log.new("Lobby")
 local player = Players.LocalPlayer
@@ -43,12 +44,7 @@ local screen, panels, hotbar, levelFill, levelText = nil, {}, nil, nil, nil
 local actions, keyMap = {}, {}
 
 local function openPanel(name)
-	for n, p in pairs(panels) do
-		if n ~= name then
-			p.close()
-		end
-	end
-	panels[name].open()
+	panels[name].toggle() -- Panel manager closes whatever else is open
 end
 
 local function sidePanel(list, anchorX, posX)
@@ -76,9 +72,10 @@ local function sidePanel(list, anchorX, posX)
 end
 
 local function eventBanner()
-	local holder = Theme.make("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 12), Size = UDim2.fromOffset(300, 92), BackgroundTransparency = 1 }, screen)
-	Theme.label({ Text = "EVENTS", Size = UDim2.new(1, 0, 0, 22), TextColor3 = Color3.fromRGB(255, 230, 120) }, holder)
-	local card = Theme.make("TextButton", { Text = "", AutoButtonColor = false, Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 62), BackgroundColor3 = Theme.COLORS.Event, ZIndex = 2 }, holder)
+	local holder = Theme.make("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 8), Size = UDim2.fromOffset(300, 100), BackgroundTransparency = 1 }, screen)
+	-- label sits fully above the card+glow (glow spreads 6px) and on a higher ZIndex
+	Theme.label({ Text = "EVENTS", Size = UDim2.new(1, 0, 0, 24), ZIndex = 5, TextColor3 = Color3.fromRGB(255, 230, 120) }, holder)
+	local card = Theme.make("TextButton", { Text = "", AutoButtonColor = false, Position = UDim2.fromOffset(0, 36), Size = UDim2.new(1, 0, 0, 62), BackgroundColor3 = Theme.COLORS.Event, ZIndex = 2 }, holder)
 	Theme.round(card, 14)
 	Theme.stroke(card, 3)
 	Theme.gloss(card)
@@ -167,6 +164,10 @@ function LobbyUI.init()
 	end
 	-- Play opens the real map/mode picker (server decides pick vs join, same as the portal).
 	actions.Play = function()
+		if Panel.current() == MapSelect.panel then
+			MapSelect.panel.close()
+			return
+		end
 		Net.send("RequestPlay")
 	end
 	for name, def in pairs(Theme.COLORS) do
@@ -209,9 +210,7 @@ end
 function LobbyUI.setVisible(v)
 	screen.Enabled = v
 	if not v then
-		for _, p in pairs(panels) do
-			p.close()
-		end
+		Panel.closeCurrent()
 	end
 end
 

@@ -16,7 +16,7 @@ When a player enters the portal circle (edge-triggered), the server sends `OpenM
 All UI is built in code, with no StarterGui instances. Rojo then owns every line, diffs stay reviewable, and the UI can read registries directly.
 - `UI/Theme`: colors, outline stroke, gloss gradient, glow frame, outlined label.
 - `UI/Button`: rounded glowing icon button with a shortcut letter, an optional "New!" tag and hover/press UIScale tweens. Click handlers run under `Log.try`.
-- `UI/Panel`: modal panel with a title, a "Coming soon" body and a close button.
+- `UI/Panel`: modal panel with a title, a "Coming soon" body and a close button. `Panel.register({open, close})` adds any panel (MapSelect included) to the one-open-at-a-time manager, which provides `toggle`, `closeCurrent` and closing on Esc.
 - `UI/Card`: unit card with a ViewportFrame portrait (cube plus topper), rarity border, Lv, cost, name, damage-type badge and element badge.
 - The lobby is visible only while `MatchState == "lobby"`; the in-match Hotbar and HUD are unchanged.
 - **Play** sends `RequestPlay`. The server responds exactly as if the player had stepped into the portal: it offers a pick or a join, or rejects with a toast.

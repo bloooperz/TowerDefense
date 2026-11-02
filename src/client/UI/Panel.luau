@@ -3,6 +3,49 @@ local Theme = require(script.Parent.Theme)
 
 local Panel = {}
 
+-- Central manager: at most ONE panel open at a time, for every panel (placeholder panels,
+-- event panel, map picker, future panels). Anything with open()/close() can register.
+local current = nil
+function Panel.register(p)
+	local rawOpen, rawClose = p.open, p.close
+	function p.open()
+		if current and current ~= p then
+			local prev = current
+			current = nil
+			prev.close()
+		end
+		current = p
+		rawOpen()
+	end
+	function p.close()
+		if current == p then
+			current = nil
+		end
+		rawClose()
+	end
+	function p.toggle()
+		if current == p then
+			p.close()
+		else
+			p.open()
+		end
+	end
+	return p
+end
+function Panel.closeCurrent()
+	if current then
+		current.close()
+	end
+end
+function Panel.current()
+	return current
+end
+game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
+	if input.KeyCode == Enum.KeyCode.Escape and not gpe then
+		Panel.closeCurrent()
+	end
+end)
+
 function Panel.new(title, parent, color)
 	local root = Theme.make("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -27,7 +70,10 @@ function Panel.new(title, parent, color)
 	function p.close()
 		root.Visible = false
 	end
-	close.Activated:Connect(p.close)
+	Panel.register(p)
+	close.Activated:Connect(function()
+		p.close()
+	end)
 	return p
 end
 
