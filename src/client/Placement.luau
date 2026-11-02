@@ -30,8 +30,12 @@ function Placement.reason()
 		return "Not enough money!"
 	end
 	local pos = ghost.Position
-	if not Maps.isValidPlacement(Maps.get(RS_INFO():GetAttribute("MapId")), pos, unit.size) or MyUnits.overlapsAny(pos, unit.size) then
-		return "Invalid spot!"
+	local spot = Maps.placementReason(Maps.get(RS_INFO():GetAttribute("MapId") or ""), pos, unit.size)
+	if spot then
+		return spot
+	end
+	if MyUnits.overlapsAny(pos, unit.size) then
+		return "Overlaps another unit"
 	end
 	return nil
 end

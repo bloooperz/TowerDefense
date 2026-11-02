@@ -9,7 +9,8 @@ local Net = require(Shared.Net)
 local Style = require(script.Parent.Style)
 
 local MapSelect = {}
-local root
+local root, titleLabel, startBtn, mapsCol, modesCol
+local kind = "pick"
 local chosenMap, chosenMode
 local mapButtons, modeButtons = {}, {}
 
@@ -51,8 +52,9 @@ end
 function MapSelect.init()
 	local screen = Style.make("ScreenGui", { Name = "MapSelect", ResetOnSpawn = false, DisplayOrder = 20 }, Players.LocalPlayer:WaitForChild("PlayerGui"))
 	root = Style.panel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(520, 360), Visible = false }, screen)
-	Style.text({ Text = "Choose a map", Size = UDim2.new(1, 0, 0, 36), Position = UDim2.fromOffset(0, 8) }, root)
+	titleLabel = Style.text({ Text = "Choose a map", Size = UDim2.new(1, 0, 0, 36), Position = UDim2.fromOffset(0, 8) }, root)
 	local maps, modes = column("Map", 0, root), column("Mode", 0.5, root)
+	mapsCol, modesCol = maps.Parent, modes.Parent
 	for i, m in ipairs(Maps.list) do
 		local b = button(m.name, maps, i)
 		mapButtons[m.id] = b
@@ -73,10 +75,13 @@ function MapSelect.init()
 	chosenMode = Modes.list[1] and Modes.list[1].id
 	paint()
 	local start = button("Start", root, 0)
+	startBtn = start
 	start.AnchorPoint, start.Position, start.Size = Vector2.new(1, 1), UDim2.new(1, -12, 1, -12), UDim2.fromOffset(160, 44)
 	start.BackgroundColor3 = Style.GREEN
 	start.MouseButton1Click:Connect(function()
-		if chosenMap and chosenMode then
+		if kind == "join" then
+			Net.send("JoinMatch")
+		elseif chosenMap and chosenMode then
 			Net.send("ChooseMap", chosenMap, chosenMode)
 		end
 		root.Visible = false
@@ -87,7 +92,14 @@ function MapSelect.init()
 	cancel.MouseButton1Click:Connect(function()
 		root.Visible = false
 	end)
-	Net.listen("OpenMapSelect", function()
+	-- payload: { kind = "pick" } or { kind = "join", mapName, modeName, players }
+	Net.listen("OpenMapSelect", function(p)
+		kind = (type(p) == "table" and p.kind) or "pick"
+		local join = kind == "join"
+		mapsCol.Visible, modesCol.Visible = not join, not join
+		titleLabel.Text = join and ("Join %s (%s)? %d in lobby"):format(p.mapName or "?", p.modeName or "?", p.players or 0)
+			or "Choose a map"
+		startBtn.Text = join and "Join" or "Start"
 		root.Visible = true
 	end)
 	Net.listen("MatchState", function()

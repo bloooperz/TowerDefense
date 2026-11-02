@@ -4,6 +4,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Damage = require(Shared.Damage)
 local StatusLogic = require(Shared.StatusLogic)
 local Enemies = require(script.Parent.Enemies)
+local Log = require(Shared.Log)
 
 local Combat = {}
 Combat.stats = {} -- [player] = { damage, kills }
@@ -61,7 +62,7 @@ function Combat.damage(e, base, source)
 			s.kills += 1
 		end
 		for _, fn in ipairs(killListeners) do
-			task.spawn(fn, e, source)
+			task.spawn(Log.try, "Combat", "onKill listener", fn, e, source)
 		end
 	else
 		Enemies.updateBar(e)
@@ -89,7 +90,7 @@ function Combat.tick(dt)
 		if e.alive and Enemies.distance(e, t) >= Enemies.path.length then
 			Enemies.remove(e)
 			for _, fn in ipairs(leakListeners) do
-				fn(e)
+				Log.try("Combat", "onLeak listener", fn, e)
 			end
 		end
 	end

@@ -1,8 +1,11 @@
 -- Single remote layer. Every remote is declared here with argument types and a rate limit.
--- Server:  Net.initServer(); Net.on(name, fn(plr, ...)); Net.fire(name, plr, ...); Net.fireAll(name, ...)
+-- Server:  Net.initServer(); Net.on(name, fn(plr, ...) -> rejectReason?); Net.fire(name, plr, ...); Net.fireAll(name, ...)
 -- Client:  Net.send(name, ...); Net.listen(name, fn(...))
 local RunService = game:GetService("RunService")
 local RS = game:GetService("ReplicatedStorage")
+
+local Log = require(script.Parent.Log)
+local log = Log.new("Net")
 
 local Net = {}
 
@@ -14,10 +17,12 @@ Net.DEFS = {
 	SetTargeting = { dir = "c2s", args = { "number", "string" }, rate = 6 },
 	Vote = { dir = "c2s", args = {}, rate = 3 },
 	ChooseMap = { dir = "c2s", args = { "string", "string" }, rate = 2 },
+	JoinMatch = { dir = "c2s", args = {}, rate = 2 },
 	ReturnToLobby = { dir = "c2s", args = {}, rate = 2 },
 	MatchState = { dir = "s2c" },
 	OpenMapSelect = { dir = "s2c" },
 	Results = { dir = "s2c" },
+	Notify = { dir = "s2c" }, -- (text, kind) toast; kind = "error" | "info"
 }
 
 local folder
@@ -38,12 +43,12 @@ end
 function Net.validate(def, ...)
 	local n = select("#", ...)
 	if n < #def.args or n > #def.args then
-		return false
+		return false, ("expected %d args, got %d"):format(#def.args, n)
 	end
 	for i, want in ipairs(def.args) do
 		local v = select(i, ...)
 		if typeof(v) ~= want or bad(v) then
-			return false
+			return false, ("arg %d: expected %s, got %s"):format(i, want, typeof(v))
 		end
 	end
 	return true
@@ -90,17 +95,35 @@ local function remote(name)
 	return remotes[name]
 end
 
+-- Handlers return nil on success or a player-facing reason string on rejection.
+-- Rejections are logged with player + action and sent to the client as a toast.
+-- Handler errors are caught with a traceback and reported as "Server error".
+local rateWarned = {}
 function Net.on(name, fn)
 	local def = Net.DEFS[name]
 	assert(RunService:IsServer() and def and def.dir == "c2s", "Net.on: bad remote " .. name)
 	remote(name).OnServerEvent:Connect(function(plr, ...)
 		if not allow(plr, name, def.rate or 5) then
+			local k = plr.UserId .. name
+			if not rateWarned[k] or os.clock() - rateWarned[k] > 5 then
+				rateWarned[k] = os.clock()
+				log.warn(plr.Name, name, "rejected: rate limited")
+			end
 			return
 		end
-		if not Net.validate(def, ...) then
+		local ok, why = Net.validate(def, ...)
+		if not ok then
+			log.warn(plr.Name, name, "rejected: bad args:", why)
+			remote("Notify"):FireClient(plr, "Bad request (" .. name .. ")", "error")
 			return
 		end
-		fn(plr, ...)
+		local success, reason = Log.try("Net", name .. " from " .. plr.Name, fn, plr, ...)
+		if not success then
+			remote("Notify"):FireClient(plr, "Server error (" .. name .. ")", "error")
+		elseif type(reason) == "string" then
+			log.warn(plr.Name, name, "rejected:", reason)
+			remote("Notify"):FireClient(plr, reason, "error")
+		end
 	end)
 end
 

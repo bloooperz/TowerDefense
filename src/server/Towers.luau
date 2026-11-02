@@ -9,6 +9,8 @@ local UnitStats = require(Shared.UnitStats)
 local World = require(script.Parent.World)
 local Enemies = require(script.Parent.Enemies)
 local Api = require(script.Parent.AbilityApi)
+local Log = require(Shared.Log)
+local log = Log.new("Towers")
 
 local Towers = {}
 Towers.placed = {}
@@ -19,10 +21,7 @@ local abilityFolder = script.Parent:WaitForChild("Abilities")
 local function hook(t, name, ...)
 	local a = t.ability
 	if a and a[name] then
-		local ok, err = pcall(a[name], a, ...)
-		if not ok then
-			warn(("[Ability %s.%s] %s"):format(t.unit.id, name, tostring(err)))
-		end
+		Log.try("Ability", t.unit.id .. "." .. name, a[name], a, ...)
 	end
 end
 Towers.hook = hook
@@ -76,16 +75,14 @@ function Towers.place(unitId, pos, owner)
 	if u.ability then
 		local mod = abilityFolder:FindFirstChild(u.ability)
 		if mod then
-			local ok, res = pcall(function()
+			local ok, res = Log.try("Ability", u.ability .. ".new", function()
 				return require(mod).new(t, t.stats.ability, Api)
 			end)
 			if ok then
 				t.ability = res
-			else
-				warn("[Ability " .. u.ability .. ".new] " .. tostring(res))
 			end
 		else
-			warn("Missing ability module " .. u.ability)
+			log.error("missing ability module", u.ability, "for unit", u.id)
 		end
 	end
 	table.insert(Towers.placed, t)
@@ -113,7 +110,7 @@ function Towers.tick(dt)
 			if t.cooldown <= 0 then
 				local target = Enemies.pick(t.part.Position, t.stats.range, t.part:GetAttribute("Targeting"), t.unit.hitsAir)
 				if target then
-					attack(t, target)
+					Log.try("Towers", "attack " .. t.unit.id, attack, t, target)
 					t.cooldown = math.max(t.cooldown, -Config.TICK_RATE) + t.stats.rate
 				end
 			end

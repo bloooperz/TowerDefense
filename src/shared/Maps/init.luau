@@ -1,6 +1,7 @@
 -- Map registry + helpers (world-space path, placement validity).
 local Config = require(script.Parent.Config)
 local Path = require(script.Parent.Path)
+local PlacementRules = require(script.Parent.PlacementRules)
 local Maps = require(script.Parent.Registry).load(script)
 
 local cache = {}
@@ -21,17 +22,13 @@ function Maps.spawnPoint(map)
 	return Config.MAP_ORIGIN + map.spawnOffset
 end
 
--- Same rule on client (preview) and server (authority).
+-- Same rule on client (preview) and server (authority). Returns reason or nil.
+function Maps.placementReason(map, pos: Vector3, size: number): string?
+	return PlacementRules.spotReason(map, map and Maps.path(map), Config.MAP_ORIGIN, pos, size)
+end
+
 function Maps.isValidPlacement(map, pos: Vector3, size: number): boolean
-	if not map then
-		return false
-	end
-	local rel = pos - Config.MAP_ORIGIN
-	if math.abs(rel.X) > map.bounds.X or math.abs(rel.Z) > map.bounds.Z then
-		return false
-	end
-	local _, off = Maps.path(map):nearest(pos)
-	return off >= map.trackWidth / 2 + size / 2
+	return Maps.placementReason(map, pos, size) == nil
 end
 
 return Maps

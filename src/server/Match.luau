@@ -17,6 +17,9 @@ local EnemySim = require(script.Parent.Enemies)
 local Combat = require(script.Parent.Combat)
 local Towers = require(script.Parent.Towers)
 local PlayerData = require(script.Parent.Services.PlayerData)
+local Log = require(Shared.Log)
+local PlacementRules = require(Shared.PlacementRules)
+local log = Log.new("Match")
 
 local Match = {}
 local inMatch = {} -- [player] = true
@@ -27,7 +30,9 @@ local baseHealth, wave, enemiesLeft, wavesCleared = Config.BASE_HEALTH, 0, 0, 0
 local startedAt = 0
 local matchToken = 0
 local info
-local promptedAt = {} -- [player] = os.clock() of last map-select prompt
+local insidePortal = {} -- [player] = true while standing in the portal (edge detect)
+local offeredAt = {} -- [player] = os.clock() when we last offered pick/join (valid OFFER_WINDOW)
+local OFFER_WINDOW = 120
 
 local function count(t)
 	local n = 0
@@ -110,8 +115,11 @@ local function setVote(plr, v)
 end
 
 local function joinMatch(plr)
-	if inMatch[plr] or state ~= "waiting" then
-		return
+	if inMatch[plr] then
+		return "Already in the match"
+	end
+	if state ~= "waiting" then
+		return "No open match to join (" .. state .. ")"
 	end
 	inMatch[plr] = true
 	plr:SetAttribute("Voted", false)
@@ -121,7 +129,9 @@ local function joinMatch(plr)
 	end
 	moveTo(plr, Maps.spawnPoint(map))
 	Net.fire("MatchState", plr, state)
+	log.info(plr.Name, "joined", map.id, mode.id)
 	sync()
+	return nil
 end
 
 local function leaveMatch(plr)
@@ -160,21 +170,33 @@ local function resetMatch()
 end
 
 local function chooseMap(plr, mapId, modeId)
-	if state ~= "idle" or not promptedAt[plr] then
-		return -- only players standing in the portal may pick
+	if state ~= "idle" then
+		return "A match is already open"
+	end
+	if not offeredAt[plr] or os.clock() - offeredAt[plr] > OFFER_WINDOW then
+		return "Step into the portal first"
 	end
 	local m, md = Maps.get(mapId), Modes.get(modeId)
-	if not m or not md then
-		return
+	if not m then
+		return "Unknown map " .. mapId
+	end
+	if not md then
+		return "Unknown mode " .. modeId
+	end
+	local ok, path = Log.try("Match", "buildMap " .. mapId, World.buildMap, m)
+	if not ok then
+		World.clearMap()
+		return "Failed to build map"
 	end
 	map, mode = m, md
-	local path = World.buildMap(map)
 	EnemySim.setPath(path, map.id)
+	offeredAt[plr] = nil
+	log.info(plr.Name, "opened match", map.id, mode.id)
 	state = "waiting"
 	World.portalLabel.Text = ("%s (%s) - step in to join!"):format(map.name, mode.name)
 	startCountdown()
 	sync()
-	joinMatch(plr)
+	return joinMatch(plr)
 end
 
 local function finish(won)
@@ -230,7 +252,7 @@ local function alive()
 	return baseHealth > 0 and next(inMatch) ~= nil and state == "running"
 end
 
-function runWaves()
+local function runWavesInner()
 	state = "running"
 	matchToken += 1
 	startedAt = os.clock()
@@ -254,7 +276,10 @@ function runWaves()
 					break
 				end
 				if def then
-					EnemySim.spawn(def, { hpMult = w.hpMult, speedMult = w.speedMult })
+					Log.try("Match", "spawn " .. g.enemy, EnemySim.spawn, def, { hpMult = w.hpMult, speedMult = w.speedMult })
+				else
+					log.error("wave", wave, "unknown enemy id", g.enemy)
+					enemiesLeft = math.max(enemiesLeft - 1, 0)
 				end
 				task.wait(g.delay)
 			end
@@ -278,6 +303,16 @@ function runWaves()
 		return
 	end
 	finish(baseHealth > 0 and mode.maxWaves ~= nil and wavesCleared >= mode.maxWaves)
+end
+
+function runWaves()
+	local ok = Log.try("Match", "runWaves", runWavesInner)
+	if not ok then
+		for plr in pairs(inMatch) do
+			Net.fire("Notify", plr, "Match crashed - returning to lobby", "error")
+		end
+		resetMatch()
+	end
 end
 
 local function ownedTower(plr, id)
@@ -323,7 +358,7 @@ function Match.init(infoFolder)
 		end)
 	end)
 	Players.PlayerRemoving:Connect(function(plr)
-		promptedAt[plr] = nil
+		insidePortal[plr], offeredAt[plr] = nil, nil
 		if inMatch[plr] then
 			inMatch[plr], votes[plr] = nil, nil
 			Towers.removeOwner(plr)
@@ -338,42 +373,65 @@ function Match.init(infoFolder)
 		end
 	end)
 
-	-- Portal: idle -> open map select (once per entry); waiting -> join.
+	-- Portal (edge-triggered on entering the circle). Nobody is teleported here:
+	--   idle    -> offer the map/mode picker (ChooseMap confirms)
+	--   waiting -> offer a join prompt (JoinMatch confirms)
+	--   running/over -> toast "in progress"
 	task.spawn(function()
 		while true do
 			task.wait(0.25)
-			for _, plr in ipairs(Players:GetPlayers()) do
-				local root = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-				local inside = false
-				if root and not inMatch[plr] then
-					local d = root.Position - Config.PORTAL_POS
-					inside = Vector2.new(d.X, d.Z).Magnitude <= Config.PORTAL_SIZE / 2 and math.abs(d.Y) < 8
-				end
-				if inside then
-					if state == "waiting" then
-						joinMatch(plr)
-					elseif state == "idle" and not promptedAt[plr] then
-						promptedAt[plr] = os.clock()
-						Net.fire("OpenMapSelect", plr)
+			Log.try("Match", "portal", function()
+				for _, plr in ipairs(Players:GetPlayers()) do
+					local root = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+					local inside = false
+					if root and not inMatch[plr] then
+						local d = root.Position - Config.PORTAL_POS
+						inside = Vector2.new(d.X, d.Z).Magnitude <= Config.PORTAL_SIZE / 2 and math.abs(d.Y) < 8
 					end
-				else
-					promptedAt[plr] = nil
+					if inside and not insidePortal[plr] then
+						if state == "idle" then
+							offeredAt[plr] = os.clock()
+							Net.fire("OpenMapSelect", plr, { kind = "pick" })
+						elseif state == "waiting" then
+							offeredAt[plr] = os.clock()
+							Net.fire("OpenMapSelect", plr, { kind = "join", mapName = map.name, modeName = mode.name, players = count(inMatch) })
+						else
+							Net.fire("Notify", plr, "Match in progress - wait for it to end", "info")
+						end
+					end
+					insidePortal[plr] = inside or nil
 				end
-			end
+			end)
 		end
 	end)
 
 	Net.on("ChooseMap", chooseMap)
 
-	Net.on("Vote", function(plr)
-		if inMatch[plr] and state == "waiting" then
-			setVote(plr, not votes[plr])
+	Net.on("JoinMatch", function(plr)
+		if not offeredAt[plr] or os.clock() - offeredAt[plr] > OFFER_WINDOW then
+			return "Step into the portal first"
 		end
+		offeredAt[plr] = nil
+		return joinMatch(plr)
+	end)
+
+	Net.on("Vote", function(plr)
+		if not inMatch[plr] then
+			return "You're not in a match"
+		end
+		if state ~= "waiting" then
+			return "Voting is closed"
+		end
+		setVote(plr, not votes[plr])
+		return nil
 	end)
 
 	Net.on("ReturnToLobby", function(plr)
 		if not inMatch[plr] then
-			return
+			return "You're not in a match"
+		end
+		if state == "running" then
+			return "Can't leave mid-match yet"
 		end
 		if state == "over" then
 			leaveMatch(plr)
@@ -389,37 +447,45 @@ function Match.init(infoFolder)
 	end)
 
 	Net.on("PlaceUnit", function(plr, unitId, pos)
-		if not inMatch[plr] or (state ~= "waiting" and state ~= "running") then
-			return
-		end
-		if not table.find(PlayerData.loadoutIds(plr), unitId) then
-			return
-		end
 		local u = Units.get(unitId)
 		local cash = getCash(plr)
-		if not u or not cash or cash.Value < u.cost then
-			return
+		local size = u and u.size or 0
+		pos = Vector3.new(math.round(pos.X), Config.MAP_ORIGIN.Y + Config.GROUND_TOP + size / 2, math.round(pos.Z))
+		local spot = nil
+		if u then
+			spot = map and Maps.placementReason(map, pos, size) or (not map and "No map loaded" or nil)
 		end
-		pos = Vector3.new(math.round(pos.X), Config.MAP_ORIGIN.Y + Config.GROUND_TOP + u.size / 2, math.round(pos.Z))
-		if not Maps.isValidPlacement(map, pos, u.size) or Towers.overlaps(pos, u.size) then
-			return
-		end
-		if Towers.countFor(plr, unitId) >= UnitStats.maxPlaced(u) then
-			return
+		local why = PlacementRules.reason({
+			state = state,
+			inMatch = inMatch[plr] == true,
+			inLoadout = table.find(PlayerData.loadoutIds(plr), unitId) ~= nil,
+			unit = u,
+			cash = cash and cash.Value or 0,
+			placed = u and Towers.countFor(plr, unitId) or 0,
+			maxPlaced = u and UnitStats.maxPlaced(u) or 0,
+			spotReason = spot,
+			overlaps = u ~= nil and Towers.overlaps(pos, size),
+		})
+		if why then
+			return why .. (" [%s @ %d,%d]"):format(unitId, pos.X, pos.Z)
 		end
 		cash.Value -= u.cost
 		Towers.place(unitId, pos, plr)
+		return nil
 	end)
 
 	Net.on("UpgradeUnit", function(plr, id)
 		local t = ownedTower(plr, id)
 		local cash = getCash(plr)
 		if not t or not cash then
-			return
+			return "Unit not found"
 		end
 		local cost = Towers.upgradeCost(t)
-		if not cost or cash.Value < cost then
-			return
+		if not cost then
+			return "Already max level"
+		end
+		if cash.Value < cost then
+			return "Not enough money!"
 		end
 		cash.Value -= cost
 		Towers.upgrade(t)
@@ -428,16 +494,23 @@ function Match.init(infoFolder)
 	Net.on("SellUnit", function(plr, id)
 		local t = ownedTower(plr, id)
 		local cash = getCash(plr)
-		if t and cash then
-			cash.Value += Towers.sell(t)
+		if not t or not cash then
+			return "Unit not found"
 		end
+		cash.Value += Towers.sell(t)
+		return nil
 	end)
 
 	Net.on("SetTargeting", function(plr, id, m)
 		local t = ownedTower(plr, id)
-		if t and table.find(Config.TARGET_MODES, m) then
-			t.part:SetAttribute("Targeting", m)
+		if not t then
+			return "Unit not found"
 		end
+		if not table.find(Config.TARGET_MODES, m) then
+			return "Unknown targeting " .. m
+		end
+		t.part:SetAttribute("Targeting", m)
+		return nil
 	end)
 end
 

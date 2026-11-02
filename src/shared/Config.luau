@@ -27,4 +27,7 @@ Config.STARTER_LOADOUT = { "Basic", "Sniper", "Rapid", "Mogumo" }
 -- SERVER
 Config.TICK_RATE = 0.1 -- seconds between server simulation ticks
 
+-- Bump on notable pushes; server + client print it so stale Studio scripts are obvious.
+Config.BUILD = "foundation-2"
+
 return Config

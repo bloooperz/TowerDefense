@@ -12,6 +12,8 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local DataSchema = require(Shared.DataSchema)
 local Rewards = require(Shared.Rewards)
+local Log = require(Shared.Log)
+local log = Log.new("PlayerData")
 
 local PlayerData = {}
 PlayerData.STORE_NAME = "Profiles_v1"
@@ -53,7 +55,7 @@ do
 	if ok then
 		store = res
 	else
-		warn("[PlayerData] DataStore unavailable, using in-memory mock: " .. tostring(res))
+		log.warn("DataStore unavailable, using in-memory mock (progress resets on stop):", res)
 		store = mockStore()
 		PlayerData.mock = true
 	end
@@ -76,7 +78,7 @@ local function replicate(plr, d)
 	end
 	plr:SetAttribute("Loadout", table.concat(ids, ","))
 	for _, fn in ipairs(changedListeners) do
-		task.spawn(fn, plr, d)
+		task.spawn(Log.try, "PlayerData", "onChanged", fn, plr, d)
 	end
 end
 
@@ -103,7 +105,9 @@ local function load(plr)
 			return result
 		end
 		if not ok then
-			warn("[PlayerData] load failed: " .. tostring(err))
+			log.error("load failed for", plr.Name, "attempt", attempt, err)
+		else
+			log.warn("profile for", plr.Name, "locked by another server; retry", attempt)
 		end
 		task.wait(attempt * 2)
 	end
@@ -127,7 +131,7 @@ local function save(plr, release)
 		end)
 	end)
 	if not ok then
-		warn("[PlayerData] save failed: " .. tostring(err))
+		log.error("save failed for", plr.Name, err)
 	end
 end
 
@@ -200,10 +204,13 @@ function PlayerData.init()
 		end
 		profiles[plr] = d
 		replicate(plr, d)
+		log.info("loaded", plr.Name, "loadout:", plr:GetAttribute("Loadout"))
 	end
-	Players.PlayerAdded:Connect(added)
+	Players.PlayerAdded:Connect(function(plr)
+		Log.try("PlayerData", "load " .. plr.Name, added, plr)
+	end)
 	for _, plr in ipairs(Players:GetPlayers()) do
-		task.spawn(added, plr)
+		task.spawn(Log.try, "PlayerData", "load " .. plr.Name, added, plr)
 	end
 	Players.PlayerRemoving:Connect(function(plr)
 		save(plr, true)
