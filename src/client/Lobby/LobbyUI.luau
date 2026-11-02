@@ -16,6 +16,7 @@ local Button = require(UI.Button)
 local Panel = require(UI.Panel)
 local Card = require(UI.Card)
 local MapSelect = require(script.Parent.Parent.MapSelect)
+local LobbyFeatures = require(Shared.LobbyFeatures)
 
 local log = Log.new("Lobby")
 local player = Players.LocalPlayer
@@ -45,6 +46,36 @@ local actions, keyMap = {}, {}
 
 local function openPanel(name)
 	panels[name].toggle() -- Panel manager closes whatever else is open
+end
+
+-- One panel table for buttons AND lobby circles. Circles open (never toggle-close).
+function LobbyUI.openPanel(name)
+	local p = panels[name]
+	if not p then
+		log.warn("no lobby panel named", name)
+		return
+	end
+	if Panel.current() ~= p then
+		p.open()
+	end
+end
+
+-- Lobby circles: open the feature's panel once per entry (step off + back on to reopen).
+local function watchCircles()
+	local inside, lastOpen = nil, 0
+	game:GetService("RunService").Heartbeat:Connect(function()
+		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		local f = hrp and screen.Enabled and hrp.Position.Y < 15 and LobbyFeatures.at(hrp.Position) or nil
+		local id = f and f.id
+		if id == inside then
+			return
+		end
+		inside = id
+		if f and os.clock() - lastOpen > 0.5 then
+			lastOpen = os.clock()
+			Log.try("Lobby", "circle " .. f.id, LobbyUI.openPanel, f.panel)
+		end
+	end)
 end
 
 local function sidePanel(list, anchorX, posX)
@@ -175,6 +206,13 @@ function LobbyUI.init()
 			panels[name] = Panel.new(name == "Event" and "Shadow Festival" or name, screen, def)
 		end
 	end
+	-- circle-only features get a same-style "Coming soon" placeholder in the same table
+	for _, f in ipairs(LobbyFeatures.list) do
+		if not panels[f.panel] then
+			panels[f.panel] = Panel.new(f.panel, screen, f.color)
+		end
+	end
+	watchCircles()
 
 	sidePanel(LEFT, 0, 0)
 	sidePanel(RIGHT, 1, 1)

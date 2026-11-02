@@ -1,9 +1,7 @@
 -- Placeholder lobby scenery + feature circles. Built on its own ground (top at Y=0.05) so it
 -- works with or without the default Baseplate (whose top is Y=0).
-local Players = game:GetService("Players")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
-local Net = require(Shared.Net)
 local Log = require(Shared.Log)
 local LobbyFeatures = require(Shared.LobbyFeatures)
 local World = require(script.Parent.World)
@@ -11,9 +9,7 @@ local World = require(script.Parent.World)
 local log = Log.new("LobbyMap")
 local part, billboard = World.part, World.billboard
 local LobbyMap = {}
-LobbyMap.handlers = {} -- [featureId] = function(plr) end, used when feature.enabled
 local GROUND_Y = 0.05
-local COOLDOWN = 4
 
 local function building(parent, name, pos, size, wall, roof)
 	local m = Instance.new("Model")
@@ -90,39 +86,8 @@ function LobbyMap.build()
 	spawn.Parent = root
 end
 
--- Distance polling (more reliable than Touched for thin non-colliding pads).
-local function watch()
-	local inside, lastAt = {}, {}
-	while true do
-		task.wait(0.25)
-		for _, plr in ipairs(Players:GetPlayers()) do
-			local hrp = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-			local f = hrp and hrp.Position.Y < 15 and math.abs(hrp.Position.X) < 100 and math.abs(hrp.Position.Z) < 100 and LobbyFeatures.at(hrp.Position) or nil
-			local id = f and f.id
-			if id ~= inside[plr] then
-				inside[plr] = id
-				if f and os.clock() - (lastAt[plr] or 0) >= COOLDOWN then
-					lastAt[plr] = os.clock()
-					local h = LobbyMap.handlers[f.id]
-					if f.enabled and h then
-						Log.try("LobbyMap", "feature " .. f.id, h, plr)
-					else
-						Net.fire("Notify", plr, "Coming soon: " .. f.name, "info")
-					end
-				end
-			end
-		end
-		for plr in pairs(inside) do
-			if plr.Parent == nil then inside[plr], lastAt[plr] = nil, nil end
-		end
-	end
-end
-
 function LobbyMap.init()
-	LobbyMap.build()
-	task.spawn(function()
-		Log.try("LobbyMap", "watch", watch)
-	end)
+	LobbyMap.build() -- circle entry is detected client-side (LobbyUI) and opens the lobby panel
 end
 
 return LobbyMap
