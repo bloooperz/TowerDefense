@@ -6,7 +6,7 @@ Config.MAP_ORIGIN = Vector3.new(1000, 0, 0)
 Config.TRACK_TOP = 1.1 -- Y of the track surface (relative to map origin)
 Config.GROUND_TOP = 0.5 -- Y of the ground surface (relative to map origin)
 Config.FLY_HEIGHT = 6 -- extra height for flying enemies
-Config.LOBBY_SPAWN = Vector3.new(0, 3, 0)
+Config.LOBBY_SPAWN = Vector3.new(0, 3, 15) -- on the plaza, facing the portal (LobbyMap puts the SpawnLocation here)
 Config.PORTAL_POS = Vector3.new(0, 0.6, -30)
 Config.PORTAL_SIZE = 14
 

@@ -16,6 +16,7 @@ info.Parent = RS
 
 Log.try("Main", "PlayerData.init", require(script.Parent.Services.PlayerData).init)
 Log.try("Main", "World.buildLobby", require(script.Parent.World).buildLobby)
+Log.try("Main", "LobbyMap.init", require(script.Parent.LobbyMap).init)
 Log.try("Main", "Match.init", require(script.Parent.Match).init, info)
 
 -- Fixed-rate simulation: statuses, DoTs, regen, leaks, tower attacks, ability ticks.

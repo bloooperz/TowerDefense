@@ -43,10 +43,13 @@ local function billboard(adornee, text, studs, height)
 	return l
 end
 
+World.billboard = function(...) return billboard(...) end
+
 function World.buildLobby()
 	local lobby = Instance.new("Folder")
 	lobby.Name = "Lobby"
 	lobby.Parent = workspace
+	World.lobby = lobby
 	World.portal = part({
 		Name = "Portal",
 		Shape = Enum.PartType.Cylinder,
