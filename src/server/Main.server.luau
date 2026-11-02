@@ -4,7 +4,7 @@ local RS = game:GetService("ReplicatedStorage")
 local folder = Instance.new("Folder")
 folder.Name = "Remotes"
 local remotes = {}
-for _, name in ipairs({ "PlaceUnit", "StartGame", "MatchState" }) do
+for _, name in ipairs({ "PlaceUnit", "StartGame", "MatchState", "UpgradeUnit", "SellUnit" }) do
 	local r = Instance.new("RemoteEvent")
 	r.Name, r.Parent = name, folder
 	remotes[name] = r

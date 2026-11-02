@@ -22,9 +22,32 @@ Config.BASE_HEALTH = 20
 
 -- UNITS (hotbar is built from this list, in order; keys 1-6)
 Config.UNITS = {
-	{ name = "Basic", cost = 50, size = 3, range = 18, damage = 20, rate = 0.5 },
-	{ name = "Sniper", cost = 120, size = 3, range = 45, damage = 80, rate = 2.0 },
-	{ name = "Rapid", cost = 90, size = 2, range = 14, damage = 6, rate = 0.12 },
+	-- `upgrades`: levels 2..N. Each sets ABSOLUTE stats (omitted = unchanged).
+	-- `ability` inside an upgrade overrides keys of abilityConfig.
+	{
+		name = "Basic", cost = 50, size = 3, range = 18, damage = 20, rate = 0.5,
+		upgrades = {
+			{ cost = 60, damage = 28, range = 20 },
+			{ cost = 100, damage = 40, range = 22, rate = 0.45 },
+			{ cost = 175, damage = 60, range = 25, rate = 0.4 },
+		},
+	},
+	{
+		name = "Sniper", cost = 120, size = 3, range = 45, damage = 80, rate = 2.0,
+		upgrades = {
+			{ cost = 130, damage = 120 },
+			{ cost = 220, damage = 180, range = 55, rate = 1.8 },
+			{ cost = 350, damage = 280, range = 65, rate = 1.6 },
+		},
+	},
+	{
+		name = "Rapid", cost = 90, size = 2, range = 14, damage = 6, rate = 0.12,
+		upgrades = {
+			{ cost = 100, damage = 8 },
+			{ cost = 170, damage = 11, range = 16, rate = 0.1 },
+			{ cost = 280, damage = 15, range = 18, rate = 0.08 },
+		},
+	},
 	-- Unique unit: 1 per player. `ability` = module name in src/server/Abilities.
 	{
 		name = "Mogumo",
@@ -44,8 +67,39 @@ Config.UNITS = {
 			dogLifetime = 3, -- seconds
 			dogRadius = 3, -- hit distance
 		},
+		upgrades = {
+			{ cost = 150, damage = 22, ability = { dogDamage = 60 } },
+			{ cost = 250, damage = 30, range = 25, ability = { dogDamage = 90, maxDogs = 3 } },
+			{ cost = 400, damage = 42, range = 28, rate = 0.65, ability = { dogDamage = 140, maxDogs = 4, every = 3 } },
+		},
 	},
 }
+
+Config.SELL_REFUND = 0.5 -- fraction of total spent
+
+function Config.maxLevel(u)
+	return 1 + (u.upgrades and #u.upgrades or 0)
+end
+
+-- Stats for a unit at a level: { damage, range, rate, ability = {...} }
+function Config.statsAt(u, level: number)
+	local st = { damage = u.damage, range = u.range, rate = u.rate, ability = table.clone(u.abilityConfig or {}) }
+	for i = 1, level - 1 do
+		local up = u.upgrades and u.upgrades[i]
+		if not up then
+			break
+		end
+		for _, k in ipairs({ "damage", "range", "rate" }) do
+			if up[k] then
+				st[k] = up[k]
+			end
+		end
+		for k, v in pairs(up.ability or {}) do
+			st.ability[k] = v
+		end
+	end
+	return st
+end
 
 -- WAVES
 function Config.waveInfo(wave: number)

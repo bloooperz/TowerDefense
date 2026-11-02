@@ -5,6 +5,7 @@ local UIS = game:GetService("UserInputService")
 local Config = require(RS:WaitForChild("Shared"):WaitForChild("Config"))
 local Hotbar = require(script.Parent.Hotbar)
 local Placement = require(script.Parent.Placement)
+local UnitPanel = require(script.Parent.UnitPanel)
 
 local remotes = RS:WaitForChild("Remotes")
 local placeEvent = remotes:WaitForChild("PlaceUnit")
@@ -24,6 +25,7 @@ stateEvent.OnClientEvent:Connect(function(s)
 	Hotbar.setState(s)
 	if s == "lobby" then
 		clear()
+		UnitPanel.close()
 	end
 end)
 
@@ -35,6 +37,7 @@ local function select(i)
 		clear()
 		return
 	end
+	UnitPanel.close()
 	selected = i
 	Placement.start(Config.UNITS[i])
 	Hotbar.highlight(i)
@@ -46,6 +49,23 @@ end
 
 local cashValue = Players.LocalPlayer:WaitForChild("leaderstats"):WaitForChild("Cash")
 Placement.init(cashValue)
+UnitPanel.init(cashValue, remotes:WaitForChild("UpgradeUnit"), remotes:WaitForChild("SellUnit"))
+local mouse = Players.LocalPlayer:GetMouse()
+
+-- Find one of MY placed units under the mouse (unit part or its topper).
+local function unitUnderMouse()
+	local target = mouse.Target
+	while target and target ~= workspace do
+		if target:GetAttribute("UnitId") then
+			if target:GetAttribute("OwnerId") == Players.LocalPlayer.UserId then
+				return target
+			end
+			return nil
+		end
+		target = target.Parent
+	end
+	return nil
+end
 
 local keys = {
 	[Enum.KeyCode.One] = 1,
@@ -57,6 +77,10 @@ local keys = {
 }
 
 UIS.InputBegan:Connect(function(input, processed)
+	if input.KeyCode == Enum.KeyCode.Escape then
+		UnitPanel.close() -- Esc may be marked processed by Roblox, so check first
+		return
+	end
 	if processed then
 		return
 	end
@@ -70,5 +94,13 @@ UIS.InputBegan:Connect(function(input, processed)
 			placeEvent:FireServer(selected, pos)
 		end
 		clear()
+	elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+		-- not placing: click my unit to open its panel, anywhere else closes it
+		local unit = unitUnderMouse()
+		if unit then
+			UnitPanel.open(unit)
+		else
+			UnitPanel.close()
+		end
 	end
 end)

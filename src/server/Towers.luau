@@ -38,6 +38,9 @@ local function shoot(from, to)
 	end)
 end
 
+Towers.byId = {}
+local nextId = 0
+
 local abilityFolder = script.Parent:WaitForChild("Abilities")
 
 function Towers.place(unitIndex, pos, owner)
@@ -57,22 +60,45 @@ function Towers.place(unitIndex, pos, owner)
 			CanCollide = false,
 		}, p)
 	end
-	local t = { part = p, unit = u, alive = true, owner = owner, index = unitIndex, attacks = 0 }
+	nextId += 1
+	local t = {
+		id = nextId, part = p, unit = u, alive = true, owner = owner, index = unitIndex,
+		attacks = 0, level = 1, spent = u.cost, stats = Config.statsAt(u, 1),
+	}
+	p:SetAttribute("UnitId", t.id)
+	p:SetAttribute("UnitIndex", unitIndex)
+	p:SetAttribute("OwnerId", owner and owner.UserId or 0)
+	p:SetAttribute("Level", 1)
+	p:SetAttribute("Spent", t.spent)
+
+	local bb = Instance.new("BillboardGui")
+	bb.Name, bb.Size, bb.StudsOffsetWorldSpace = "LevelTag", UDim2.fromOffset(60, 22), Vector3.new(0, u.size / 2 + 1.5, 0)
+	bb.MaxDistance = 120
+	local lbl = Instance.new("TextLabel")
+	lbl.Size, lbl.BackgroundTransparency, lbl.TextScaled = UDim2.fromScale(1, 1), 1, true
+	lbl.TextColor3, lbl.Font, lbl.Text = Color3.new(1, 1, 1), Enum.Font.GothamBold, "Lv 1"
+	lbl.TextStrokeTransparency = 0.3
+	lbl.Parent = bb
+	bb.Parent = p
+	t.levelLabel = lbl
+
 	if u.ability then
-		t.ability = require(abilityFolder:WaitForChild(u.ability)).new(t, u.abilityConfig or {})
+		t.ability = require(abilityFolder:WaitForChild(u.ability)).new(t, t.stats.ability)
 	end
 	table.insert(Towers.placed, t)
+	Towers.byId[t.id] = t
 	task.spawn(function()
 		while t.alive do
-			local target = Enemies.closest(p.Position, u.range)
+			local st = t.stats
+			local target = Enemies.closest(p.Position, st.range)
 			if target then
 				shoot(p.Position, Enemies.position(target))
-				Enemies.damage(target, u.damage)
+				Enemies.damage(target, st.damage)
 				t.attacks += 1
 				if t.ability and t.ability.onAttack then
 					t.ability:onAttack(target)
 				end
-				task.wait(u.rate)
+				task.wait(t.stats.rate)
 			else
 				task.wait(0.1)
 			end
@@ -92,6 +118,43 @@ function Towers.overlaps(pos, size)
 	return false
 end
 
+-- Returns upgrade cost, or nil if maxed.
+function Towers.upgradeCost(t)
+	local up = t.unit.upgrades and t.unit.upgrades[t.level]
+	return up and up.cost
+end
+
+function Towers.upgrade(t)
+	t.spent += Towers.upgradeCost(t)
+	t.level += 1
+	t.stats = Config.statsAt(t.unit, t.level)
+	if t.ability then
+		t.ability.cfg = t.stats.ability
+	end
+	t.part:SetAttribute("Level", t.level)
+	t.part:SetAttribute("Spent", t.spent)
+	t.levelLabel.Text = "Lv " .. t.level
+end
+
+local function destroy(t)
+	t.alive = false
+	if t.ability and t.ability.cleanup then
+		t.ability:cleanup()
+	end
+	t.part:Destroy()
+	Towers.byId[t.id] = nil
+end
+
+-- Removes the tower and returns the refund amount.
+function Towers.sell(t)
+	local i = table.find(Towers.placed, t)
+	if i then
+		table.remove(Towers.placed, i)
+	end
+	destroy(t)
+	return math.floor(t.spent * Config.SELL_REFUND)
+end
+
 function Towers.countFor(owner, unitIndex)
 	local n = 0
 	for _, t in ipairs(Towers.placed) do
@@ -104,11 +167,7 @@ end
 
 function Towers.clear()
 	for _, t in ipairs(Towers.placed) do
-		t.alive = false
-		if t.ability and t.ability.cleanup then
-			t.ability:cleanup()
-		end
-		t.part:Destroy()
+		destroy(t)
 	end
 	table.clear(Towers.placed)
 end

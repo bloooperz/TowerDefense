@@ -180,6 +180,40 @@ function Match.init(r)
 		cash.Value -= u.cost
 		Towers.place(index, pos, plr)
 	end)
+
+	local function ownedTower(plr, id)
+		if state == "idle" or not inMatch[plr] or typeof(id) ~= "number" then
+			return nil
+		end
+		local t = Towers.byId[id]
+		if t and t.alive and t.owner == plr then
+			return t
+		end
+		return nil
+	end
+
+	remotes.UpgradeUnit.OnServerEvent:Connect(function(plr, id)
+		local t = ownedTower(plr, id)
+		local cash = getCash(plr)
+		if not t or not cash then
+			return
+		end
+		local cost = Towers.upgradeCost(t)
+		if not cost or cash.Value < cost then
+			return
+		end
+		cash.Value -= cost
+		Towers.upgrade(t)
+	end)
+
+	remotes.SellUnit.OnServerEvent:Connect(function(plr, id)
+		local t = ownedTower(plr, id)
+		local cash = getCash(plr)
+		if not t or not cash then
+			return
+		end
+		cash.Value += Towers.sell(t)
+	end)
 end
 
 return Match
