@@ -164,7 +164,7 @@ function LobbyUI.init()
 	end
 	-- Play opens the real map/mode picker (server decides pick vs join, same as the portal).
 	actions.Play = function()
-		if Panel.current() == MapSelect.panel then
+		if MapSelect.panel and Panel.current() == MapSelect.panel then
 			MapSelect.panel.close()
 			return
 		end
