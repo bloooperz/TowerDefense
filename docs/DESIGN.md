@@ -164,3 +164,10 @@ The three PlayerData fixes were required first and are done in commit `7d83550` 
 1. Save retries with exponential backoff, including on leave and BindToClose.
 2. No forced lock steal: wait for the lock to be released or go stale, otherwise kick.
 3. Reload on lost session: if another server takes over, stop saving the stale copy and reload or kick.
+
+## Mogumo — Evolution Reward (Deferred)
+
+- Mogumo is NOT a banner unit and must NOT be in the summon pool.
+- He is the highest-tier, hardest-to-get unit of the zero update, obtained only by grinding and evolving: the player must evolve a base unit into Mogumo using evolution materials.
+- Evolution is quest-based for the strongest/best units and material-based for other units.
+- Do not add Mogumo to any banner, summon config or drop table.
