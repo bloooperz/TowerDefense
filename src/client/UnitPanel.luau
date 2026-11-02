@@ -7,8 +7,19 @@ local Config = require(Shared.Config)
 local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
 local Traits = require(Shared.Traits)
+local Passive = require(Shared.Passive)
+local Log = require(Shared.Log)
+local TweenService = game:GetService("TweenService")
+local Theme = require(script.Parent.UI.Theme)
+local Toast = require(script.Parent.Toast)
+local log = Log.new("UnitPanel")
+local warned = {} -- [unitName] = true: passive problems are logged/toasted once per unit
+local sideOpen = false
+local SLIDE = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local NEON = Color3.fromRGB(200, 70, 255)
 
 local UnitPanel = {}
+local refreshPassive
 local player = Players.LocalPlayer
 local cashValue, upgradeEvent, sellEvent, targetEvent
 local gui = {}
@@ -62,6 +73,36 @@ local function statLine(label, now, nxt, suffix)
 	return s
 end
 
+local function setSide(open)
+	sideOpen = open
+	gui.passiveBtn.Text = (gui.passiveIcon or "✦") .. "  " .. (gui.passiveName or "Passive") .. (open and "  ◀" or "  ▶")
+	TweenService:Create(gui.side, SLIDE, { Position = open and UDim2.fromScale(0, 0) or UDim2.fromScale(-1.05, 0) }):Play()
+end
+
+refreshPassive = function(u, st, nx)
+	if not Passive.has(u) then
+		gui.passiveBtn.Visible = false
+		if sideOpen then
+			setSide(false)
+		end
+		return
+	end
+	gui.passiveBtn.Visible = true
+	gui.passiveName, gui.passiveIcon = u.passive.name or "Passive", u.passive.icon
+	gui.sideTitle.Text = (u.passive.icon and (u.passive.icon .. " ") or "") .. gui.passiveName
+	local plain, rich, problems = Passive.describe(u, st, nx)
+	if #problems > 0 and not warned[u.name] then
+		warned[u.name] = true
+		for _, p in ipairs(problems) do
+			log.warn("passive:", p)
+		end
+		Toast.show(("%s passive info is broken (see Output)"):format(u.name), "error")
+	end
+	gui.sideText.Text = rich or plain or "No description available."
+	gui.sideHint.Text = nx and "Green = changes on next upgrade" or "Max level"
+	gui.passiveBtn.Text = (gui.passiveIcon or "✦") .. "  " .. gui.passiveName .. (sideOpen and "  ◀" or "  ▶")
+end
+
 local function refresh()
 	if not current or not current.Parent then
 		UnitPanel.close()
@@ -89,11 +130,8 @@ local function refresh()
 		statLine("Range", st.range, nx and nx.range),
 		statLine("Attack every", st.rate, nx and nx.rate, "s"),
 	}
-	if st.ability.dogDamage then
-		table.insert(lines, statLine("Dog damage", st.ability.dogDamage, nx and nx.ability.dogDamage))
-		table.insert(lines, statLine("Max dogs", st.ability.maxDogs, nx and nx.ability.maxDogs))
-		table.insert(lines, statLine("Dog every Nth hit", st.ability.every, nx and nx.ability.every))
-	end
+	-- passive-specific numbers live in the Passive side panel, not here (core stats only)
+	refreshPassive(u, st, nx)
 	for i, l in ipairs(gui.stats) do
 		l.Text = lines[i] or ""
 	end
@@ -186,7 +224,7 @@ function UnitPanel.init(cash, upEv, sellEv, targetEv)
 	round(gui.view, 10)
 
 	gui.stats = {}
-	for i = 1, 6 do
+	for i = 1, 3 do
 		gui.stats[i] = text({
 			Position = UDim2.fromOffset(16, 214 + (i - 1) * 22),
 			Size = UDim2.new(1, -32, 0, 18),
@@ -194,6 +232,41 @@ function UnitPanel.init(cash, upEv, sellEv, targetEv)
 			TextColor3 = Color3.fromRGB(220, 220, 230),
 		}, panel)
 	end
+
+	-- Passive info button + companion side panel (slides out to the right of the unit screen).
+	-- Child of the unit panel, so it hides with it; not a top-level Panel (one-panel rule untouched).
+	gui.passiveBtn = make("TextButton", {
+		Position = UDim2.fromOffset(16, 284), Size = UDim2.new(1, -32, 0, 34),
+		Text = "Passive", Font = Theme.FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1),
+		TextStrokeTransparency = 0, TextStrokeColor3 = Theme.OUTLINE,
+		BackgroundColor3 = NEON, AutoButtonColor = true, Visible = false, ZIndex = 3,
+	}, panel)
+	round(gui.passiveBtn, 10)
+	Theme.stroke(gui.passiveBtn, 3)
+	Theme.gloss(gui.passiveBtn)
+	make("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6) }, gui.passiveBtn)
+	gui.passiveBtn.MouseButton1Click:Connect(function()
+		Log.try("UnitPanel", "toggle passive", setSide, not sideOpen)
+	end)
+	local clip = make("Frame", {
+		Position = UDim2.new(1, 8, 0, 40), Size = UDim2.fromOffset(250, 260),
+		BackgroundTransparency = 1, ClipsDescendants = true,
+	}, panel)
+	gui.side = make("Frame", {
+		Position = UDim2.fromScale(-1.05, 0), Size = UDim2.new(1, -8, 1, -8),
+		BackgroundColor3 = Theme.PANEL,
+	}, clip)
+	round(gui.side, 14)
+	Theme.stroke(gui.side, 3)
+	make("UIStroke", { Thickness = 2, Color = NEON, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, gui.side)
+	gui.sideTitle = Theme.label({ Position = UDim2.fromOffset(12, 10), Size = UDim2.new(1, -24, 0, 30), TextColor3 = NEON, TextXAlignment = Enum.TextXAlignment.Left }, gui.side)
+	gui.sideText = Theme.label({
+		Position = UDim2.fromOffset(12, 48), Size = UDim2.new(1, -24, 1, -84),
+		TextScaled = false, TextSize = 17, TextWrapped = true, RichText = true,
+		TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
+		TextStrokeTransparency = 0.6, Font = Enum.Font.GothamMedium,
+	}, gui.side)
+	gui.sideHint = Theme.label({ Position = UDim2.new(0, 12, 1, -30), Size = UDim2.new(1, -24, 0, 18), TextColor3 = Color3.fromRGB(170, 170, 200), TextXAlignment = Enum.TextXAlignment.Left }, gui.side)
 
 	local function button(label, color, y)
 		local b = make("TextButton", {
@@ -272,6 +345,15 @@ function UnitPanel.open(unitPart)
 	refresh()
 end
 
+-- Esc: close the passive side panel first, then the unit screen.
+function UnitPanel.escape()
+	if current and sideOpen then
+		setSide(false)
+	else
+		UnitPanel.close()
+	end
+end
+
 function UnitPanel.close()
 	for _, c in ipairs(conns) do
 		c:Disconnect()
@@ -282,6 +364,10 @@ function UnitPanel.close()
 		ring = nil
 	end
 	current, model = nil, nil
+	if gui.side then
+		sideOpen = false
+		gui.side.Position = UDim2.fromScale(-1.05, 0) -- snap shut; reopening starts collapsed
+	end
 	if gui.panel then
 		gui.panel.Visible = false
 	end

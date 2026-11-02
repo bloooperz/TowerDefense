@@ -109,7 +109,7 @@ local HOTBAR = { hotbar1 = 1, hotbar2 = 2, hotbar3 = 3, hotbar4 = 4, hotbar5 = 5
 
 UIS.InputBegan:Connect(function(input, processed)
 	if input.KeyCode == Enum.KeyCode.Escape then
-		UnitPanel.close() -- Esc may be marked processed by Roblox, so check first
+		UnitPanel.escape() -- passive side panel first, then the unit screen. Esc may be marked processed by Roblox, so check first
 		return
 	end
 	if processed or Input.capturing then
