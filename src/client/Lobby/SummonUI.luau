@@ -38,27 +38,68 @@ local function clear(f)
 	end
 end
 
-local function grid(parent, props, cell)
-	local f = Theme.make("ScrollingFrame", { BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 6, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 22 }, parent)
-	for k, v in pairs(props) do
-		f[k] = v
-	end
-	Theme.make("UIGridLayout", { CellSize = cell or UDim2.fromOffset(86, 104), CellPadding = UDim2.fromOffset(8, 8), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, f)
-	return f
-end
-
 function SummonUI.build(panel)
-	panel.root.Size = UDim2.fromOffset(640, 330)
-	panel.body.Visible = false
+	-- FULL-SCREEN summon view (own design): warm/purple gradient backdrop with faint diagonal
+	-- streaks, title + banner + timer top-left, featured units large in the center, pity
+	-- bottom-left, gems + x1/x10/x50 bottom-right, Panel's X top-right. Lobby HUD hides meanwhile.
 	local root = panel.root
+	root.Size, root.Position, root.AnchorPoint = UDim2.fromScale(1, 1), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5)
+	panel.body.Visible = false
+	local tb = root:FindFirstChild("TitleBanner")
+	if tb then
+		tb.Visible = false -- replaced by the top-left title block
+	end
+	local bg = Theme.make("Frame", { Name = "Backdrop", BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 20 }, root)
+	Theme.make("UIGradient", { Rotation = 30, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(38, 14, 64)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(110, 36, 96)), ColorSequenceKeypoint.new(1, Color3.fromRGB(214, 112, 44)) }) }, bg)
+	for k = 1, 7 do
+		Theme.make("Frame", { Name = "Decor", BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(k / 8, 0.5), Size = UDim2.new(0, 10 + (k % 3) * 14, 1.6, 0), Rotation = 24, BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.93, ZIndex = 20 }, bg)
+	end
+	local floor = Theme.make("Frame", { Name = "Stage", BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.62), Size = UDim2.fromScale(0.8, 0.14), BackgroundColor3 = Color3.fromRGB(255, 200, 120), ZIndex = 20 }, bg)
+	Theme.make("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 1) }) }, floor)
 
-	local info = Theme.label({ Size = UDim2.new(1, -40, 0, 24), Position = UDim2.fromOffset(20, 56), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BODY, TextColor3 = W.TEXT, ZIndex = 22 }, root)
-	local cards = grid(root, { Position = UDim2.fromOffset(20, 88), Size = UDim2.new(1, -40, 0, 116) })
-	local pityText = Theme.label({ Size = UDim2.new(1, -40, 0, 22), Position = UDim2.fromOffset(20, 212), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BODY, TextColor3 = W.YELLOW, ZIndex = 22 }, root)
+	local title = Theme.label({ Text = "Summon", Size = UDim2.fromOffset(320, 56), Position = UDim2.fromOffset(28, 18), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 }, root)
+	Shape.outlineText(title, 3)
+	Theme.label({ Text = "Standard Banner", Size = UDim2.fromOffset(320, 30), Position = UDim2.fromOffset(30, 76), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = W.YELLOW, ZIndex = 22 }, root)
+	local info = Theme.label({ Size = UDim2.fromOffset(320, 24), Position = UDim2.fromOffset(30, 108), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BODY, TextColor3 = W.TEXT, ZIndex = 22 }, root)
+
+	-- featured units: large static 3D models (ViewportFrames), name + rarity under each
+	local cards = Theme.make("Frame", { Name = "Featured", BackgroundTransparency = 1, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.46), Size = UDim2.fromScale(0.72, 0.5), ZIndex = 21 }, root)
+	Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Bottom, Padding = UDim.new(0.03, 0), SortOrder = Enum.SortOrder.LayoutOrder }, cards)
+	local function featuredSlot(def, order, big)
+		local rc = Config.RARITY_COLORS[def.rarity] or W.BORDER
+		local slot = Theme.make("Frame", { Name = "Slot" .. order, BackgroundTransparency = 1, BorderSizePixel = 0, LayoutOrder = order, Size = UDim2.fromScale(big and 0.34 or 0.26, big and 1 or 0.82), ZIndex = 21 }, cards)
+		local vp = Card.portrait(def, slot)
+		vp.Name, vp.BackgroundTransparency, vp.BorderSizePixel, vp.ZIndex = "Model", 1, 0, 22
+		vp.Size = UDim2.new(1, 0, 1, -64)
+		local plate = Theme.make("Frame", { Name = "Plate", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromScale(0.5, 1), Size = UDim2.new(0.9, 0, 0, 58), BackgroundColor3 = Theme.Unit.BASE, ZIndex = 22 }, slot)
+		Shape.apply(plate, { radius = 6, fill = Theme.Unit.BASE, transparency = 0.15, edge = rc, thickness = big and 3 or 2, gradient = false })
+		Theme.label({ Text = def.name, Size = UDim2.new(1, -12, 0, 30), Position = UDim2.fromOffset(6, 4), ZIndex = 23 }, plate)
+		Theme.label({ Text = def.rarity or "Common", Size = UDim2.new(1, -12, 0, 18), Position = UDim2.fromOffset(6, 34), TextColor3 = rc, ZIndex = 23 }, plate)
+	end
+	local function rank(id)
+		local d = Units.get(id)
+		return d and table.find(Summon.RARITIES, d.rarity) or 0
+	end
+
+	-- pity progress bottom-left (+ Rates above it)
+	local pityBox = Theme.make("Frame", { Name = "Pity", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 28, 1, -24), Size = UDim2.fromOffset(360, 66), BackgroundColor3 = Theme.Unit.BASE, ZIndex = 22 }, root)
+	Shape.apply(pityBox, { radius = 6, fill = Theme.Unit.BASE, transparency = 0.2, edge = W.YELLOW, thickness = 3, gradient = false })
+	local pityText = Theme.label({ Size = UDim2.new(1, -20, 0, 24), Position = UDim2.fromOffset(10, 6), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = W.YELLOW, ZIndex = 23 }, pityBox)
+	local pityBar = Theme.make("Frame", { Name = "PityBar", Position = UDim2.fromOffset(10, 38), Size = UDim2.new(1, -20, 0, 16), BackgroundColor3 = Color3.fromRGB(30, 24, 30), ZIndex = 23 }, pityBox)
+	Shape.apply(pityBar, { radius = 4, fill = Color3.fromRGB(30, 24, 30), transparency = 0, edge = Color3.fromRGB(10, 8, 10), thickness = 2, gradient = false })
+	local pityFill = Theme.make("Frame", { Name = "Fill", BorderSizePixel = 0, Size = UDim2.fromScale(0, 1), BackgroundColor3 = W.YELLOW, ZIndex = 24 }, pityBar)
+
+	-- gem balance bottom-right, above the summon row
+	local gems = Theme.label({ Name = "Gems", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -SummonReveal.ROW_MARGIN, 1, -(SummonReveal.ROW_MARGIN + SummonReveal.ROW_H + 8)), Size = UDim2.fromOffset(260, 30), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = Color3.fromRGB(90, 200, 255), ZIndex = 22 }, root)
+	local function updGems()
+		gems.Text = ("Gems: %d"):format(player:GetAttribute("Gems") or 0)
+	end
+	player:GetAttributeChangedSignal("Gems"):Connect(updGems)
+	updGems()
 
 	local SR = SummonReveal
 	local ROW_W = #Summon.TIERS * SR.BTN_W + (#Summon.TIERS - 1) * 10
-	local row = Theme.make("Frame", { Name = "SummonRow", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.fromOffset(ROW_W, SR.ROW_H), BackgroundTransparency = 1, ZIndex = 22 }, root)
+	local row = Theme.make("Frame", { Name = "SummonRow", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -SR.ROW_MARGIN, 1, -SR.ROW_MARGIN), Size = UDim2.fromOffset(ROW_W, SR.ROW_H), BackgroundTransparency = 1, ZIndex = 22 }, root)
 	Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, row)
 	local busy, lastSent = false, nil
 	local clicks = SummonReveal.clicks()
@@ -88,7 +129,7 @@ function SummonUI.build(panel)
 			Net.send("Summon", tier)
 		end)
 	end
-	Rates.button(root, { Position = UDim2.new(1, -110, 0, 212), ZIndex = 24 })
+	Rates.button(root, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 28, 1, -100), Size = UDim2.fromOffset(110, 36), ZIndex = 24 })
 
 	-- Results popup: dark horizontal BAND across the middle (summon screen faintly visible above,
 	-- below and through it), cards pop in left -> right with a flame effect. Purely visual.
@@ -295,17 +336,19 @@ function SummonUI.build(panel)
 			shownWindow = w
 			clear(cards)
 			local banner = Summon.banner(w, Units.list)
-			for i, id in ipairs(banner.units) do
-				local def = Units.get(id)
+			for i, f in ipairs(SummonReveal.featured(banner.units, rank)) do
+				local def = Units.get(f.id)
 				if def then
-					Card.new(def, 1, cards).LayoutOrder = i
+					featuredSlot(def, i, f.emphasized)
 				end
 			end
 		end
 		local left = math.max(0, math.floor(Summon.secondsLeft(t)))
-		info.Text = ("Standard Banner  -  rotates in %02d:%02d"):format(left // 60, left % 60)
+		info.Text = ("Rotates in %02d:%02d"):format(left // 60, left % 60)
 		local _, top = Summon.effectiveRates(Summon.banner(w, Units.list))
-		pityText.Text = ("Pity %d / %d  -  %s guaranteed at %d"):format(player:GetAttribute("SummonPity") or 0, Summon.PITY_THRESHOLD, top or "?", Summon.PITY_THRESHOLD)
+		local pity = player:GetAttribute("SummonPity") or 0
+		pityText.Text = ("Pity %d / %d  -  %s guaranteed"):format(pity, Summon.PITY_THRESHOLD, top or "?")
+		pityFill.Size = UDim2.fromScale(math.clamp(pity / Summon.PITY_THRESHOLD, 0, 1), 1)
 	end
 	task.spawn(function()
 		while root.Parent do

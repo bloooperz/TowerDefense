@@ -81,6 +81,27 @@ function SummonReveal.rowRect(h)
 	local bottom = h - SummonReveal.ROW_MARGIN
 	return bottom - SummonReveal.ROW_H, bottom
 end
+-- Full-screen banner: featured units left -> right with the highest rarity in the CENTER
+-- (emphasized). rank(id) -> number, higher = rarer. Returns { {id, emphasized}, ... }.
+function SummonReveal.featured(ids, rank)
+	local sorted = table.clone(ids or {})
+	table.sort(sorted, function(a, b)
+		local ra, rb = rank(a), rank(b)
+		if ra ~= rb then
+			return ra > rb
+		end
+		return a < b
+	end)
+	local out = {}
+	if #sorted == 3 then
+		sorted = { sorted[2], sorted[1], sorted[3] }
+	end
+	for i, id in ipairs(sorted) do
+		table.insert(out, { id = id, emphasized = (#sorted == 3 and i == 2) or (#sorted ~= 3 and i == 1) })
+	end
+	return out
+end
+
 function SummonReveal.buttonText(tier, cost)
 	return ("x%d  %d Gems"):format(tier, cost)
 end
