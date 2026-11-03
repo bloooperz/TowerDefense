@@ -8,6 +8,8 @@ local Modes = require(Shared.Modes)
 local Net = require(Shared.Net)
 local Style = require(script.Parent.Style)
 local Panel = require(script.Parent.UI.Panel)
+local Shape = require(script.Parent.UI.Shape)
+local UiState = require(Shared.UiState)
 
 local MapSelect = {}
 local root, titleLabel, startBtn, mapsCol, modesCol
@@ -15,12 +17,25 @@ local kind = "pick"
 local chosenMap, chosenMode
 local mapButtons, modeButtons = {}, {}
 
+-- Selected = solid orange fill + thick dark-orange border for every map (UiState.pickCard),
+-- painted via Shape.setFill so the hover/press tween can't fade it back to the neutral fill.
+local PICK = { ORANGE = Style.ORANGE, ORANGE_EDGE = Style.ORANGE, NEUTRAL = Style.MID, BORDER = Style.STROKE }
+local function paintPick(b, selected)
+	local v = UiState.pickCard(selected)
+	local h = Shape.get(b)
+	if h then
+		h.setFill(PICK[v.fill])
+		h.setEdge(PICK[v.edge], v.thickness)
+	else
+		b.BackgroundColor3 = PICK[v.fill]
+	end
+end
 local function paint()
 	for id, b in pairs(mapButtons) do
-		b.BackgroundColor3 = id == chosenMap and Style.ORANGE or Style.MID
+		paintPick(b, id == chosenMap)
 	end
 	for id, b in pairs(modeButtons) do
-		b.BackgroundColor3 = id == chosenMode and Style.ORANGE or Style.MID
+		paintPick(b, id == chosenMode)
 	end
 end
 

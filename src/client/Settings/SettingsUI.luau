@@ -11,6 +11,8 @@ local UI = script.Parent.Parent.UI
 local Theme = require(UI.Theme)
 local Button = require(UI.Button)
 local Panel = require(UI.Panel)
+local Shape = require(UI.Shape)
+local UiState = require(Shared.UiState)
 local Input = require(script.Parent.Parent.Input)
 local Toast = require(script.Parent.Parent.Toast)
 local ClientSettings = require(script.Parent.ClientSettings)
@@ -82,21 +84,37 @@ local function confirmButton(text, color, parent, props, run)
 	return b
 end
 
+-- Shared toggle helper (every Settings ON/OFF row). Paints through Shape.setFill so a running
+-- hover/press tween can't overwrite the color; click paints optimistically, reverts + toasts on reject.
+local function paintToggle(b, on)
+	local v = UiState.toggle(on)
+	b.Text = v.text
+	local col = v.fill == "GREEN" and Theme.World.GREEN or GREY
+	local h = Shape.get(b)
+	if h then
+		h.setFill(col)
+	else
+		b.BackgroundColor3 = col
+	end
+end
+
 local function toggleRow(order, label, key)
 	local r = row(order)
 	Theme.label({ Text = label, Size = UDim2.new(1, -120, 1, -12), Position = UDim2.fromOffset(12, 6), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23 }, r)
 	local b = chunky("", GREY, r, { Size = UDim2.fromOffset(90, 32), Position = UDim2.new(1, -100, 0.5, -16) })
 	local function refresh()
-		local on = ClientSettings.get()[key]
-		b.Text = on and "ON" or "OFF"
-		b.BackgroundColor3 = on and Theme.World.GREEN or GREY
+		paintToggle(b, ClientSettings.get()[key])
 	end
 	b.Activated:Connect(function()
-		local ok, why = ClientSettings.set(key, not ClientSettings.get()[key])
+		local was = ClientSettings.get()[key] == true
+		local want = UiState.flip(was)
+		paintToggle(b, want) -- instant
+		local ok, why = ClientSettings.set(key, want)
 		if not ok then
+			log.warn("toggle", key, "rejected:", why)
 			Toast.show("Couldn't change " .. label .. ": " .. tostring(why), "error")
 		end
-		refresh()
+		refresh() -- re-sync with the real value (reverts on reject)
 	end)
 	table.insert(refreshers, refresh)
 end

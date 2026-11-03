@@ -102,14 +102,20 @@ function Shape.apply(gui, opts)
 	local handle = { box = gui, corner = corner, stroke = stroke }
 	local baseFill = gui.BackgroundColor3
 	local syncing = false
+	local bright, tween = 1, nil -- current hover brightness + running hover tween
 	function handle.fill()
 		return baseFill
 	end
 	function handle.setFill(col, tr)
 		if col then
+			-- a running hover/press tween would otherwise overwrite the new color with the old base
+			if tween then
+				tween:Cancel()
+				tween = nil
+			end
 			baseFill = col
 			syncing = true
-			gui.BackgroundColor3 = col
+			gui.BackgroundColor3 = scaleColor(col, bright)
 			syncing = false
 		end
 		if tr then
@@ -145,12 +151,20 @@ function Shape.apply(gui, opts)
 		gui.AutoButtonColor = false
 		local scale = gui:FindFirstChildOfClass("UIScale") or new("UIScale", {}, gui)
 		local hovering = false
-		local function show(bright, s)
+		local function show(k, s)
+			bright = k
 			syncing = true
-			TweenService:Create(gui, QUICK, { BackgroundColor3 = scaleColor(baseFill, bright) }):Play()
-			task.delay(QUICK.Time, function()
-				syncing = false
+			if tween then
+				tween:Cancel()
+			end
+			local my = TweenService:Create(gui, QUICK, { BackgroundColor3 = scaleColor(baseFill, k) })
+			tween = my
+			my.Completed:Connect(function()
+				if tween == my then
+					tween, syncing = nil, false
+				end
 			end)
+			my:Play()
 			TweenService:Create(scale, QUICK, { Scale = s }):Play()
 		end
 		gui.MouseEnter:Connect(function()
