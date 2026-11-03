@@ -2,7 +2,7 @@
 -- (Net studioOnly) and every handler re-checks IsStudio. Cheat state is in memory only and
 -- never written to PlayerData/DataStore (attributes like Rerolls are display-only; saves use
 -- the data table). EXCEPTION: the leveling test buttons (DevGrantUnitXp / DevGrantPlayerXp /
--- DevGiveItem / DevGiveUnit / DevGiveGold) intentionally write real progression so save/rejoin can be tested.
+-- DevGiveItem / DevGiveUnit / DevGiveGold / DevGiveGems) intentionally write real progression so save/rejoin can be tested.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local RS = game:GetService("ReplicatedStorage")
@@ -18,6 +18,7 @@ local Towers = require(script.Parent.Towers)
 local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.Services.PlayerData)
 local Items = require(Shared.Items)
+local DevGrants = require(Shared.DevGrants)
 
 local log = Log.new("Dev")
 local Dev = {}
@@ -200,6 +201,19 @@ function Dev.init()
 		end
 		Net.fire("Notify", plr, ("+%d Gold"):format(n), "info")
 		return PlayerData.devGiveGold(plr, math.floor(n))
+	end))
+	Net.on("DevGiveGems", guard(function(plr)
+		-- real grant path (same as stage rewards): PlayerData.grant { gems } -> save + Gems attribute
+		local why = DevGrants.giveGems(studio(), PlayerData.get(plr) ~= nil, function(g)
+			PlayerData.grant(plr, g)
+		end)
+		if why then
+			log.warn(plr.Name, "DevGiveGems refused:", why)
+			return why
+		end
+		log.info(plr.Name, "dev +" .. DevGrants.GEMS, "gems")
+		Net.fire("Notify", plr, ("+%d Gems"):format(DevGrants.GEMS), "info")
+		return nil
 	end))
 	Net.on("DevGiveUnit", guard(function(plr, unitId)
 		if not Units.get(unitId) then

@@ -46,6 +46,7 @@ Net.DEFS = {
 	DevGrantPlayerXp = { dir = "c2s", args = { "number" }, rate = 4, studioOnly = true },
 	DevGiveItem = { dir = "c2s", args = { "string", "number" }, rate = 4, studioOnly = true },
 	DevGiveGold = { dir = "c2s", args = { "number" }, rate = 4, studioOnly = true },
+	DevGiveGems = { dir = "c2s", args = {}, rate = 4, studioOnly = true },
 	DevGiveUnit = { dir = "c2s", args = { "string" }, rate = 4, studioOnly = true }, -- duplicate for fuse tests
 	Beam = { dir = "s2c", unreliable = true }, -- (from, to, color) drawn client-side -- (text, kind) toast; kind = "error" | "info"
 }
