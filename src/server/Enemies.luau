@@ -8,6 +8,7 @@ local StatusLogic = require(Shared.StatusLogic)
 local World = require(script.Parent.World)
 local Net = require(Shared.Net)
 local EnemyLife = require(Shared.EnemyLife)
+local EnemyLabel = require(Shared.EnemyLabel)
 local nextId = 0
 
 local Enemies = {}
@@ -48,12 +49,27 @@ function Enemies.checkpoint(e)
 	writeAttrs(e)
 end
 
+-- Billboard: type name (top), HP number, bar (bottom). Text is set with real values at spawn
+-- and the HP number only changes with the bar's 2% steps (no per-frame work, no extra connections).
+local function outlined(parent, y, h, text, color)
+	local l = Instance.new("TextLabel")
+	l.BackgroundTransparency, l.Size, l.Position = 1, UDim2.new(1, 0, 0, h), UDim2.fromOffset(0, y)
+	l.Font, l.TextScaled, l.Text = Enum.Font.GothamBold, true, text
+	l.TextColor3, l.TextStrokeColor3, l.TextStrokeTransparency = color, Color3.new(0, 0, 0), 0
+	l.Parent = parent
+	return l
+end
 local function healthBar(e)
+	local w = math.clamp(e.def.size * 14, 30, 90)
 	local g = Instance.new("BillboardGui")
-	g.Size, g.StudsOffsetWorldSpace = UDim2.fromOffset(math.clamp(e.def.size * 14, 30, 90), 8), Vector3.new(0, e.def.size / 2 + 1, 0)
+	g.Size, g.StudsOffsetWorldSpace = UDim2.fromOffset(math.max(w, 80), 34), Vector3.new(0, e.def.size / 2 + 1.8, 0)
 	g.MaxDistance = 140
+	outlined(g, 0, 14, EnemyLabel.name(e.def), Color3.new(1, 1, 1)).Name = "TypeName"
+	e.hpText = outlined(g, 14, 12, EnemyLabel.hp(e.hp, e.maxHp), Color3.fromRGB(220, 255, 220))
+	e.hpText.Name = "HpText"
 	local bg = Instance.new("Frame")
-	bg.Size, bg.BackgroundColor3, bg.BorderSizePixel = UDim2.fromScale(1, 1), Color3.fromRGB(20, 20, 20), 0
+	bg.AnchorPoint, bg.Position = Vector2.new(0.5, 1), UDim2.fromScale(0.5, 1)
+	bg.Size, bg.BackgroundColor3, bg.BorderSizePixel = UDim2.fromOffset(w, 8), Color3.fromRGB(20, 20, 20), 0
 	bg.Parent = g
 	local fill = Instance.new("Frame")
 	fill.Size, fill.BackgroundColor3, fill.BorderSizePixel = UDim2.fromScale(1, 1), Color3.fromRGB(60, 220, 60), 0
@@ -77,6 +93,10 @@ function Enemies.updateBar(e)
 		if h ~= e.barH then
 			e.barH = h
 			e.bar.Size = UDim2.fromScale(h, 1)
+			local t = EnemyLabel.hp(e.hp, e.maxHp)
+			if e.hpText and t ~= e.hpText.Text then
+				e.hpText.Text = t
+			end
 		end
 		if s ~= e.barS then
 			e.barS = s
