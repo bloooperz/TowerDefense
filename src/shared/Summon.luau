@@ -14,6 +14,8 @@
 --    since no summonable unit is Legendary/Mythic; their rates pass down to Epic). Hitting the top rarity (naturally or by pity) resets it to 0.
 --  * Summons cost GEMS. Selling a unit pays GOLD (SELL_GOLD[rarity]); Gold has no sink yet.
 local Summon = {}
+local Limits = if script then require(script.Parent.Limits) else require("./Limits") -- Roblox | lune
+Summon.MAX_UNITS = Limits.MAX_UNITS
 
 Summon.RARITIES = { "Common", "Rare", "Epic", "Legendary", "Mythic" } -- low -> high
 Summon.RATES = { Common = 0, Rare = 0.785, Epic = 0.18, Legendary = 0.03, Mythic = 0.005 } -- sums to 1
@@ -154,6 +156,34 @@ function Summon.shouldAutoSell(rarity: string, autoSell): boolean
 	return autoSell ~= nil and autoSell.on == true and Summon.rank(rarity) <= Summon.rank(autoSell.max)
 end
 
+-- True when auto-sell would sell EVERY rarity the banner can drop (so no roll takes a slot).
+function Summon.autoSellCoversPool(banner, autoSell): boolean
+	if not (autoSell and autoSell.on == true) then
+		return false
+	end
+	for _, r in ipairs(Summon.RARITIES) do
+		local ids = banner and banner.byRarity and banner.byRarity[r]
+		if ids and #ids > 0 and not Summon.shouldAutoSell(r, autoSell) then
+			return false
+		end
+	end
+	return true
+end
+
+-- Inventory cap check (before any charge). owned >= cap always rejects (players over the cap keep
+-- their units but can't summon). Otherwise free slots must be >= tier, unless auto-sell covers the
+-- whole pool (then rolls never take a slot). Whole summon rejected, never partial.
+function Summon.checkRoom(owned: number, tier: number, cap: number, coversPool: boolean): string?
+	if owned >= cap then
+		return ("Inventory full (%d/%d). Sell units to make room."):format(owned, cap)
+	end
+	local free = cap - owned
+	if not coversPool and free < tier then
+		return ("Not enough room: need %d free slots, you have %d"):format(tier, free)
+	end
+	return nil
+end
+
 -- Full server-side summon on a data table. deps = { rand, genUid, newUnit, rarityOf(unitId) }.
 -- Mutates d (gems spent, gold from auto-sell, summonPity, units).
 -- Returns reason or nil, results { {unitId, rarity, uid?, sold?} }, goldBack.
@@ -161,6 +191,14 @@ function Summon.apply(d, tier, banner, autoSell, deps)
 	local why, cost = Summon.check(tier, d.gems)
 	if why then
 		return why
+	end
+	local owned = 0
+	for _ in pairs(d.units or {}) do
+		owned += 1
+	end
+	local room = Summon.checkRoom(owned, tier, (deps and deps.maxUnits) or Summon.MAX_UNITS, Summon.autoSellCoversPool(banner, autoSell))
+	if room then
+		return room
 	end
 	d.gems -= cost
 	local pity = d.summonPity or 0

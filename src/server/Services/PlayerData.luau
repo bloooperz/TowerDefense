@@ -489,6 +489,7 @@ function PlayerData.summon(plr, tier)
 		end,
 		genUid = genUid,
 		newUnit = DataSchema.newUnit,
+		maxUnits = Config.MAX_UNITS,
 	})
 	if reason then
 		return reason

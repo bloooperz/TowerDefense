@@ -45,4 +45,6 @@ Config.ELEMENT_COLORS = {
 	Earth = Color3.fromRGB(170, 120, 60), Light = Color3.fromRGB(255, 250, 200),
 }
 
+Config.MAX_UNITS = require(script.Parent.Limits).MAX_UNITS -- inventory cap (Limits is the lune-loadable source)
+
 return Config

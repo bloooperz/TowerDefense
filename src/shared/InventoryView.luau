@@ -2,8 +2,9 @@
 -- Maps the replicated `Inventory` attribute (decoded JSON list) to grid cards + a detail view.
 -- Stats are shown exactly as stored on the unit def (no derived numbers / percentages).
 local InventoryView = {}
+local Limits = if script then require(script.Parent.Limits) else require("./Limits") -- Roblox | lune
 
-InventoryView.MAX_UNITS = 100 -- header "Units: N/100" (display cap only)
+InventoryView.MAX_UNITS = Limits.MAX_UNITS -- header "Units: N/100"; same cap the server enforces
 InventoryView.MAX_LEVEL = 80
 InventoryView.ACTIONS = { "Equip", "Sell", "Lock", "View" } -- detail buttons, top -> bottom
 InventoryView.LOADING = "Loading units..."
