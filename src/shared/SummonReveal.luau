@@ -59,43 +59,26 @@ function SummonReveal.card(r, def, traitsById)
 	return m
 end
 
--- Reveal sequence. skipAnim (setting) -> starts in summary.
--- mode: "reveal" (one at a time) | "summary" (grid of all) | "empty"
-function SummonReveal.sequence(results, skipAnim)
-	local n = #(results or {})
-	local s = { index = n > 0 and 1 or 0, count = n, mode = n == 0 and "empty" or (skipAnim and "summary" or "reveal") }
-	function s.current()
-		return s.mode == "reveal" and results[s.index] or nil
+-- Card-row reveal (Anime Vanguards style). Units are already granted; this is purely visual.
+-- Every result becomes a card, left -> right in result order, popping in STAGGER apart with a
+-- flame effect. skipAnim (Settings > Skip summon animation) -> all cards at once, no flame.
+SummonReveal.STAGGER = 0.07
+function SummonReveal.layout(results, skipAnim, def, traitsById)
+	local cards = {}
+	for i, r in ipairs(results or {}) do
+		local m = SummonReveal.card(r, def and def(r.unitId), traitsById)
+		m.order = i
+		m.delay = skipAnim and 0 or (i - 1) * SummonReveal.STAGGER
+		m.flame = not skipAnim
+		m.sold = m.soldText ~= nil
+		m.hasModel = true -- every card holds a ViewportFrame (placeholder when the def is missing)
+		table.insert(cards, m)
 	end
-	function s.next() -- Next (click/Space): advance; past the last -> summary (single result: summary too)
-		if s.mode ~= "reveal" then
-			return s.mode
-		end
-		if s.index < n then
-			s.index += 1
-		else
-			s.mode = "summary"
-		end
-		return s.mode
-	end
-	function s.skip()
-		if s.mode == "reveal" then
-			s.mode = "summary"
-		end
-		return s.mode
-	end
-	function s.counter()
-		return ("%d / %d"):format(s.index, n)
-	end
-	function s.showSkip()
-		return s.mode == "reveal" and n > 1
-	end
-	return s
+	return { cards = cards, empty = #cards == 0 }
 end
 
--- Click routing while the reveal/summary is up. target: "model" (unit viewport, drag-to-spin),
--- "button" (Next/Skip: their own action), "other" (anywhere else on the popup).
--- Dismiss fires on RELEASE so a drag that started on a model never dismisses.
+-- Click routing while results are up. target: "model" (a result card / its viewport),
+-- "button" (summon row: its own action), "other" (empty space -> dismiss on RELEASE).
 function SummonReveal.clicks()
 	local c = { pressed = nil }
 	function c.press(target)
