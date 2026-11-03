@@ -107,7 +107,7 @@ return function(t)
 		t.eq(s:find("UDim2.fromOffset(SR.BTN_W, SR.ROW_H)", 1, true) ~= nil, true)
 		t.eq(s:find("hidden[c], c.Visible = true, false", 1, true) ~= nil, true)
 		local card = fs.readFile("src/client/UI/Card.luau")
-		t.eq(card:find("Color = Card.modelColor(u)", 1, true) ~= nil, true)
+		t.eq(card:find("color = Card.modelColor(u)", 1, true) ~= nil, true)
 	end)
 	t.test("featured: three banner units, rarest in the emphasized center", function()
 		local r = { a = 2, b = 3, c = 2 }

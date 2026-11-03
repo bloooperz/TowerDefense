@@ -7,6 +7,7 @@ local Config = require(Shared.Config)
 local Units = require(Shared.Units)
 local UnitStats = require(Shared.UnitStats)
 local UnitLevel = require(Shared.UnitLevel)
+local UnitModels = require(Shared.UnitModels)
 local Traits = require(Shared.Traits)
 local World = require(script.Parent.World)
 local Enemies = require(script.Parent.Enemies)
@@ -68,6 +69,20 @@ function Towers.place(unitId, pos, owner, opts, accountLevel)
 			CanCollide = false,
 		}, p)
 	end
+	-- visual model from the shared registry; the cube part above stays the hitbox (range, selection,
+	-- attributes, billboard) and goes invisible when a real/placeholder model stands in for it.
+	if UnitModels.kind(u) ~= "cube" then
+		-- height ~1.3x the hitbox so the LevelTag billboard (size/2 + 1.5 above center) clears the head
+		local model = UnitModels.clone(u, { size = u.size * 1.3 })
+		model:PivotTo(CFrame.new(pos - Vector3.new(0, u.size / 2, 0)))
+		model.Name = "Model"
+		model.Parent = p
+		p.Transparency = 1
+		local top = p:FindFirstChild("Topper")
+		if top then
+			top.Transparency = 1
+		end
+	end -- cube fallback: the hitbox part already IS the cube (unchanged look)
 	nextId += 1
 	local t = {
 		id = nextId, part = p, unit = u, alive = true, owner = owner, unitId = unitId,

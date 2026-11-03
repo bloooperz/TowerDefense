@@ -2,10 +2,30 @@
   "name": "TowerDefense",
   "tree": {
     "$className": "DataModel",
-    "ReplicatedStorage": { "Shared": { "$path": "src/shared" } },
-    "ServerScriptService": { "Server": { "$path": "src/server" } },
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "Assets": {
+        "$className": "Folder",
+        "$ignoreUnknownInstances": true,
+        "UnitModels": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true
+        }
+      }
+    },
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
     "StarterPlayer": {
-      "StarterPlayerScripts": { "Client": { "$path": "src/client" } }
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
     }
   }
 }

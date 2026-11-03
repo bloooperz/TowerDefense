@@ -1,8 +1,9 @@
--- Unit card: portrait (ViewportFrame cube model), rarity border, Lv, cost, name,
+-- Unit card: portrait (ViewportFrame unit model via shared/UnitModels), rarity border, Lv, cost, name,
 -- damage-type badge and optional element badge (blank icon slots, name on hover), in a non-overlapping row.
 local Theme = require(script.Parent.Theme)
 local Shape = require(script.Parent.Shape)
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+local UnitModels = require(game:GetService("ReplicatedStorage").Shared.UnitModels)
 
 local Card = {}
 
@@ -45,7 +46,7 @@ function Card.modelColor(u)
 	return (u and u.color) or (u and Config.RARITY_COLORS[u.rarity]) or Color3.fromRGB(200, 200, 205)
 end
 
--- Same cube (+ optional topper) the server builds in Towers.place, at the origin.
+-- Same registry model the server builds in Towers.place (shared/UnitModels), framed 3/4.
 -- u == nil -> loading placeholder.
 function Card.portrait(u, parent)
 	if not u then
@@ -53,13 +54,10 @@ function Card.portrait(u, parent)
 	end
 	local vp, cam = viewport(parent)
 	vp.Name = "Portrait"
-	local model = Theme.make("Model", {}, vp)
-	Theme.make("Part", { Anchored = true, Size = Vector3.one * u.size, CFrame = CFrame.new(), Color = Card.modelColor(u) }, model)
-	if u.topper then
-		Theme.make("Part", { Anchored = true, Size = Vector3.new(u.size, 0.4, u.size), CFrame = CFrame.new(0, u.size / 2 + 0.2, 0), Color = u.topper }, model)
-	end
-	local d = u.size * 1.9
-	cam.CFrame = CFrame.lookAt(Vector3.new(d * 0.7, d * 0.55, d * 0.7), Vector3.zero)
+	-- registry model (Assets folder model > procedural placeholder > rarity-colored cube)
+	local model = UnitModels.clone(u, { color = Card.modelColor(u) })
+	model.Parent = vp
+	UnitModels.frame(cam, model)
 	return vp
 end
 
