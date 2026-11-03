@@ -20,4 +20,13 @@ function UiState.pickCard(selected)
 	return { fill = "NEUTRAL", edge = "BORDER", thickness = 2 }
 end
 
+-- In-match upgrade button. cost == nil -> max level. fill: "GREEN" (affordable) | "GREY".
+function UiState.upgradeButton(cash, cost)
+	if cost == nil then
+		return { text = "MAX LEVEL", fill = "GREY", enabled = false }
+	end
+	local ok = (cash or 0) >= cost
+	return { text = "UPGRADE  $" .. cost, fill = ok and "GREEN" or "GREY", enabled = ok }
+end
+
 return UiState

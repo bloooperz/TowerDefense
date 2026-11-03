@@ -31,4 +31,18 @@ return function(t)
 		local sh = fs.readFile("src/client/UI/Shape.luau")
 		t.eq(sh:find("tween:Cancel()", 1, true) ~= nil, true)
 	end)
+	t.test("upgrade button: affordability from current cash + next cost, painted via setFill", function()
+		t.eq(UiState.upgradeButton(100, 60).fill, "GREEN"); t.eq(UiState.upgradeButton(100, 60).enabled, true)
+		t.eq(UiState.upgradeButton(59, 60).fill, "GREY"); t.eq(UiState.upgradeButton(59, 60).enabled, false)
+		t.eq(UiState.upgradeButton(60, 60).fill, "GREEN"); t.eq(UiState.upgradeButton(nil, 60).fill, "GREY")
+		t.eq(UiState.upgradeButton(999, nil).text, "MAX LEVEL"); t.eq(UiState.upgradeButton(999, nil).fill, "GREY")
+		-- after an upgrade: cash 40 left, next tier costs 100 -> grey at once
+		t.eq(UiState.upgradeButton(40, 100).fill, "GREY")
+		local fs = require("@lune/fs")
+		local s = fs.readFile("src/client/UnitPanel.luau")
+		t.eq(s:find("Shape.get(gui.upgrade).setFill(", 1, true) ~= nil, true)
+		t.eq(s:find("gui.upgrade.BackgroundColor3", 1, true), nil) -- no direct writes the tween can clobber
+		t.eq(s:find("unitPart.AttributeChanged:Connect(refresh)", 1, true) ~= nil, true) -- level change
+		t.eq(s:find("cashValue.Changed:Connect", 1, true) ~= nil, true) -- cash change
+	end)
 end

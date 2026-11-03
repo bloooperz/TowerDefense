@@ -9,6 +9,7 @@ local UnitStats = require(Shared.UnitStats)
 local UnitLevel = require(Shared.UnitLevel)
 local Traits = require(Shared.Traits)
 local Passive = require(Shared.Passive)
+local UiState = require(Shared.UiState)
 local Log = require(Shared.Log)
 local TweenService = game:GetService("TweenService")
 local Theme = require(script.Parent.UI.Theme)
@@ -143,14 +144,12 @@ local function refresh()
 		l.Text = lines[i] or ""
 	end
 
+	-- Paint through Shape.setFill: a direct BackgroundColor3 write is overwritten by the
+	-- hover/press tween still running from the Upgrade click (stale green until the next refresh).
 	local up = u.upgrades and u.upgrades[level]
-	if not up then
-		gui.upgrade.Text, gui.upgrade.BackgroundColor3, gui.upgrade.AutoButtonColor = "MAX LEVEL", GREY, false
-	else
-		local ok = cashValue.Value >= up.cost
-		gui.upgrade.Text = "UPGRADE  $" .. up.cost
-		gui.upgrade.BackgroundColor3, gui.upgrade.AutoButtonColor = ok and GREEN or GREY, ok
-	end
+	local ub = UiState.upgradeButton(cashValue.Value, up and up.cost)
+	gui.upgrade.Text, gui.upgrade.AutoButtonColor = ub.text, ub.enabled
+	Shape.get(gui.upgrade).setFill(ub.fill == "GREEN" and GREEN or GREY)
 	gui.target.Text = "Target: " .. (current:GetAttribute("Targeting") or "First")
 	local spent = current:GetAttribute("Spent") or u.cost
 	gui.sell.Text = "SELL  $" .. math.floor(spent * Config.SELL_REFUND)
