@@ -171,3 +171,9 @@ The three PlayerData fixes were required first and are done in commit `7d83550` 
 - He is the highest-tier, hardest-to-get unit of the zero update, obtained only by grinding and evolving: the player must evolve a base unit into Mogumo using evolution materials.
 - Evolution is quest-based for the strongest/best units and material-based for other units.
 - Do not add Mogumo to any banner, summon config or drop table.
+
+## Deferred change (2026-11-02): remove the Evolution level lock
+
+- Current state: Evolution is locked behind player level 15 (`PlayerLevel.UNLOCKS.Evolution = 15` in `src/shared/PlayerLevel.luau`, line 18; checked via `PlayerLevel.isUnlocked`).
+- Planned: remove/unlock this level requirement later so Evolution is available without reaching level 15.
+- Status: deferred. No code changed yet.
