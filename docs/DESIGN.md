@@ -178,6 +178,6 @@ The three PlayerData fixes were required first and are done in commit `7d83550` 
 - Planned: remove/unlock this level requirement later so Evolution is available without reaching level 15.
 - Status: deferred. No code changed yet.
 
-## Deferred item (2026-11-02): teach Vi to make UI changes himself
+## Deferred item (2026-11-02): teach Vi to make UI changes herself
 - Goal: explain to Vi how to edit and design the UI himself (in Studio and in the Rojo source files), so he can shape it exactly how he wants instead of describing changes verbally, which isn't giving him the results he wants.
 - Status: future/later item. Not started; do not do this now.
