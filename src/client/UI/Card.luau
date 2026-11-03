@@ -39,6 +39,12 @@ function Card.placeholder(parent)
 	return vp
 end
 
+-- Unit defs carry no `color` (there are no character meshes yet), so the cube used to fall
+-- back to plain white. Fall back to the rarity color instead so portraits read at a glance.
+function Card.modelColor(u)
+	return (u and u.color) or (u and Config.RARITY_COLORS[u.rarity]) or Color3.fromRGB(200, 200, 205)
+end
+
 -- Same cube (+ optional topper) the server builds in Towers.place, at the origin.
 -- u == nil -> loading placeholder.
 function Card.portrait(u, parent)
@@ -48,7 +54,7 @@ function Card.portrait(u, parent)
 	local vp, cam = viewport(parent)
 	vp.Name = "Portrait"
 	local model = Theme.make("Model", {}, vp)
-	Theme.make("Part", { Anchored = true, Size = Vector3.one * u.size, CFrame = CFrame.new(), Color = u.color or Color3.new(1, 1, 1) }, model)
+	Theme.make("Part", { Anchored = true, Size = Vector3.one * u.size, CFrame = CFrame.new(), Color = Card.modelColor(u) }, model)
 	if u.topper then
 		Theme.make("Part", { Anchored = true, Size = Vector3.new(u.size, 0.4, u.size), CFrame = CFrame.new(0, u.size / 2 + 0.2, 0), Color = u.topper }, model)
 	end

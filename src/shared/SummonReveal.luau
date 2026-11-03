@@ -63,6 +63,27 @@ end
 -- Every result becomes a card, left -> right in result order, popping in STAGGER apart with a
 -- flame effect. skipAnim (Settings > Skip summon animation) -> all cards at once, no flame.
 SummonReveal.STAGGER = 0.07
+
+-- Screen layout (pixels; h = screen height). The summon button row lives in a dedicated bottom
+-- bar (ROW_H tall, ROW_MARGIN from the bottom/right edge); the results band is centered in the
+-- space ABOVE that bar so the two never overlap. Mirrors the UDim2s used by SummonUI.
+SummonReveal.BAR = 96
+SummonReveal.ROW_H = 56
+SummonReveal.ROW_MARGIN = 20
+SummonReveal.BTN_W = 180
+SummonReveal.BAND_SCALE = 0.62
+function SummonReveal.bandRect(h)
+	local center = 0.5 * h - SummonReveal.BAR / 2
+	local half = (SummonReveal.BAND_SCALE * h - SummonReveal.BAR) / 2
+	return center - half, center + half -- top, bottom
+end
+function SummonReveal.rowRect(h)
+	local bottom = h - SummonReveal.ROW_MARGIN
+	return bottom - SummonReveal.ROW_H, bottom
+end
+function SummonReveal.buttonText(tier, cost)
+	return ("x%d  %d Gems"):format(tier, cost)
+end
 function SummonReveal.layout(results, skipAnim, def, traitsById)
 	local cards = {}
 	for i, r in ipairs(results or {}) do

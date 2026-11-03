@@ -48,7 +48,7 @@ local function grid(parent, props, cell)
 end
 
 function SummonUI.build(panel)
-	panel.root.Size = UDim2.fromOffset(640, 310)
+	panel.root.Size = UDim2.fromOffset(640, 330)
 	panel.body.Visible = false
 	local root = panel.root
 
@@ -56,17 +56,19 @@ function SummonUI.build(panel)
 	local cards = grid(root, { Position = UDim2.fromOffset(20, 88), Size = UDim2.new(1, -40, 0, 116) })
 	local pityText = Theme.label({ Size = UDim2.new(1, -40, 0, 22), Position = UDim2.fromOffset(20, 212), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BODY, TextColor3 = W.YELLOW, ZIndex = 22 }, root)
 
-	local row = Theme.make("Frame", { Position = UDim2.fromOffset(20, 244), Size = UDim2.new(1, -40, 0, 48), BackgroundTransparency = 1, ZIndex = 22 }, root)
+	local SR = SummonReveal
+	local ROW_W = #Summon.TIERS * SR.BTN_W + (#Summon.TIERS - 1) * 10
+	local row = Theme.make("Frame", { Name = "SummonRow", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.fromOffset(ROW_W, SR.ROW_H), BackgroundTransparency = 1, ZIndex = 22 }, root)
 	Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, row)
 	local busy, lastSent = false, nil
 	local clicks = SummonReveal.clicks()
 	local showing, dismiss = function() return false end, function() end -- set once the popup exists
 	for i, tier in ipairs(Summon.TIERS) do
 		local cost = tier * Summon.COST_PER_ROLL
-		local b = Theme.make("TextButton", { Text = ("Summon x%d  (%d Gems)"):format(tier, cost), Font = Theme.FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = W.BORDER_HOT, AutoButtonColor = false, Size = UDim2.fromOffset(170, 44), LayoutOrder = i, ZIndex = 23 }, row)
+		local b = Theme.make("TextButton", { Text = SR.buttonText(tier, cost), Font = Theme.FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = W.BORDER_HOT, AutoButtonColor = false, Size = UDim2.fromOffset(SR.BTN_W, SR.ROW_H), LayoutOrder = i, ZIndex = 23 }, row)
 		Theme.button(b, Theme.COLORS.Summon)
 		Shape.outlineText(b, 2)
-		Theme.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8), PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6) }, b)
+		Theme.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12) }, b)
 		b.Activated:Connect(function()
 			if clicks.summonClick(showing()) == "dismiss" then
 				dismiss()
@@ -92,7 +94,7 @@ function SummonUI.build(panel)
 	-- below and through it), cards pop in left -> right with a flame effect. Purely visual.
 	local gui = root.Parent
 	local pop = Theme.make("Frame", { Name = "SummonReveal", BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, Active = true, ZIndex = 60 }, gui)
-	local band = Theme.make("Frame", { Name = "Band", BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.46), Size = UDim2.new(1, 0, 0.5, 0), BackgroundColor3 = Color3.fromRGB(8, 6, 6), BackgroundTransparency = 0.2, ZIndex = 61 }, pop)
+	local band = Theme.make("Frame", { Name = "Band", BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, -SR.BAR / 2), Size = UDim2.new(1, 0, SR.BAND_SCALE, -SR.BAR), BackgroundColor3 = Color3.fromRGB(8, 6, 6), BackgroundTransparency = 0.2, ZIndex = 61 }, pop)
 	local head = Theme.label({ Text = "Rewards obtained", Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromOffset(0, 8), ZIndex = 62 }, band)
 	Shape.outlineText(head, 2)
 	local stage = Theme.make("ScrollingFrame", { Name = "Cards", BorderSizePixel = 0, BackgroundTransparency = 1, Position = UDim2.fromOffset(20, 44), Size = UDim2.new(1, -40, 1, -54), ScrollBarThickness = 6, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 62 }, band)
@@ -211,16 +213,38 @@ function SummonUI.build(panel)
 	end
 
 	-- The popup is a full-screen Active frame above the panel; while it shows, the summon row is
-	-- lifted INTO it (same screen spot, top ZIndex) so x1/x10/x50 stay visible and clickable.
-	local rowHome = { parent = row.Parent, pos = row.Position, z = row.ZIndex }
+	-- lifted INTO its dedicated bottom bar (bottom-right, below the band: SR.rowRect never meets
+	-- SR.bandRect) so x1/x10/x50 stay visible and clickable; it goes back on close.
+	local rowHome = { parent = row.Parent, pos = row.Position, anchor = row.AnchorPoint, z = row.ZIndex }
 	local function liftRow(on)
 		if on and row.Parent ~= pop then
-			local a, o = row.AbsolutePosition, pop.AbsolutePosition
-			row.Parent, row.Position, row.ZIndex = pop, UDim2.fromOffset(a.X - o.X, a.Y - o.Y), 80
+			row.Parent, row.AnchorPoint, row.ZIndex = pop, Vector2.new(1, 1), 80
+			row.Position = UDim2.new(1, -SR.ROW_MARGIN, 1, -SR.ROW_MARGIN)
 		elseif not on and row.Parent == pop then
-			row.Parent, row.Position, row.ZIndex = rowHome.parent, rowHome.pos, rowHome.z
+			row.Parent, row.Position, row.AnchorPoint, row.ZIndex = rowHome.parent, rowHome.pos, rowHome.anchor, rowHome.z
 		end
 	end
+
+	-- Lobby HUD (side hotkey panels, events banner, currencies/hotbar) is hidden while the summon
+	-- screen is open so nothing collides with it; restored exactly as it was on close.
+	local hidden = {}
+	root:GetPropertyChangedSignal("Visible"):Connect(function()
+		if root.Visible then
+			for _, c in ipairs(gui:GetChildren()) do
+				if c:IsA("GuiObject") and c ~= root and c ~= pop and c.Visible then
+					hidden[c], c.Visible = true, false
+				end
+			end
+		else
+			closePop()
+			for c in pairs(hidden) do
+				if c.Parent then
+					c.Visible = true
+				end
+			end
+			hidden = {}
+		end
+	end)
 	showing = function()
 		return pop.Visible and showingResults
 	end
