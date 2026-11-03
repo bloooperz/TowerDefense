@@ -42,6 +42,10 @@ function Panel.current()
 end
 game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
 	if input.KeyCode == Enum.KeyCode.Escape and not gpe and not Panel.blockEsc then -- blockEsc: rebind capture eats Esc
+		-- a panel may consume Esc first (e.g. close an inner side panel); onEsc returns true if handled
+		if current and current.onEsc and current.onEsc() then
+			return
+		end
 		Panel.closeCurrent()
 	end
 end)

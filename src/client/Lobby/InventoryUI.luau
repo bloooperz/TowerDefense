@@ -4,6 +4,7 @@
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Units = require(Shared.Units)
@@ -84,13 +85,14 @@ end
 function InventoryUI.build(panel)
 	local root = panel.root
 	root.Size = UDim2.fromOffset(6 * (CARD_W + 8) + 44, 470)
-	root.Position = UDim2.new(0.5, -150, 0.5, 0) -- leave room for the slide-out detail on the right
+	root.AnchorPoint, root.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5) -- always centered; detail overlays
 	panel.body.Visible = false
 	if panel.title then
 		panel.title.Text = "Collection"
 	end
 	local locks = InventoryView.newLocks()
-	local selected = nil
+	local sel = InventoryView.newSelection()
+	local cardFrames = {}
 	local tipOpen = false
 
 	local headerKey = Theme.label({ Text = "Units:", Size = UDim2.fromOffset(80, 24), Position = UDim2.fromOffset(24, 58), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = W.MUTED, ZIndex = 22 }, root)
@@ -102,7 +104,8 @@ function InventoryUI.build(panel)
 	local message = Theme.label({ Text = InventoryView.LOADING, Size = UDim2.new(1, -40, 0, 30), Position = UDim2.new(0, 20, 0.5, 0), TextColor3 = W.MUTED, ZIndex = 24 }, root)
 
 	-- slide-out detail (child of root -> hides with the panel; not a separate Panel)
-	local detail = Theme.make("Frame", { Position = UDim2.new(1, 12, 0, 0), Size = UDim2.fromOffset(260, 470), Visible = false, ZIndex = 30 }, root)
+	local DETAIL_W = 260
+	local detail = Theme.make("Frame", { Position = UDim2.new(1, 12, 0, 0), Size = UDim2.fromOffset(DETAIL_W, 470), Visible = false, ZIndex = 30 }, root)
 	Theme.panel(detail, U.BORDER, Theme.Unit)
 	local dlist = Theme.make("Frame", { Position = UDim2.fromOffset(14, 14), Size = UDim2.new(1, -28, 1, -28), BackgroundTransparency = 1, ZIndex = 31 }, detail)
 	Theme.make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, dlist)
@@ -122,6 +125,40 @@ function InventoryUI.build(panel)
 		if not on then
 			detail.Visible, message.Visible = false, false
 		end
+	end
+
+	local function closeDetail()
+		if sel.close() or detail.Visible then
+			detail.Visible, tip.Visible, tipOpen = false, false, false
+			render()
+			return true
+		end
+		return false
+	end
+	local dx = Theme.make("TextButton", { Name = "Close", Text = "X", Font = Theme.FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -40, 0, 10), ZIndex = 36 }, detail)
+	Theme.button(dx, W.RED)
+	Theme.make("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4) }, dx)
+	dx.Activated:Connect(closeDetail)
+	grid.InputBegan:Connect(function(i)
+		if i.UserInputType ~= Enum.UserInputType.MouseButton1 and i.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		local p = Vector2.new(i.Position.X, i.Position.Y)
+		for _, c in ipairs(cardFrames) do
+			local a, z = c.AbsolutePosition, c.AbsolutePosition + c.AbsoluteSize
+			if p.X >= a.X and p.X <= z.X and p.Y >= a.Y and p.Y <= z.Y then
+				return -- on a card: the card's own click handles it
+			end
+		end
+		closeDetail()
+	end)
+	panel.onEsc = function() -- first Esc closes detail (or View), second closes the panel
+		if view.Visible then
+			showGrid(true)
+			render()
+			return true
+		end
+		return closeDetail()
 	end
 
 	local function openView(card)
@@ -173,7 +210,7 @@ function InventoryUI.build(panel)
 		local m = InventoryView.detail(card, def, locks.isLocked(card.uid))
 		local rc = rarityColor(m.rarity)
 		Shape.get(detail).setEdge(locks.isLocked(card.uid) and W.YELLOW or rc, 3)
-		Theme.label({ Text = m.name, Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 1, ZIndex = 32 }, dlist)
+		Theme.label({ Text = m.name, Size = UDim2.new(1, -36, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 1, ZIndex = 32 }, dlist)
 		local row = Theme.make("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, LayoutOrder = 2, ZIndex = 32 }, dlist)
 		Theme.label({ Text = m.rarity, Size = UDim2.new(0.55, 0, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = rc, ZIndex = 32 }, row)
 		local chip = Theme.make("TextButton", { Text = m.traitText, Font = Theme.FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = m.trait and W.BLUE or U.BASE, AutoButtonColor = false, AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0), Size = UDim2.new(0.42, 0, 1, 0), ZIndex = 33 }, row)
@@ -216,7 +253,18 @@ function InventoryUI.build(panel)
 				end
 			end)
 		end
-		detail.Visible = true
+		-- beside the root's right edge; if that overflows the screen, overlap the grid's right side instead
+		local cam = workspace.CurrentCamera
+		local screenW = cam and cam.ViewportSize.X or 1920
+		local fits = root.AbsolutePosition.X + root.AbsoluteSize.X + 12 + DETAIL_W <= screenW - 8
+		local target = fits and UDim2.new(1, 12, 0, 0) or UDim2.new(1, -DETAIL_W - 8, 0, 0)
+		if not detail.Visible then
+			detail.Position = target - UDim2.fromOffset(24, 0)
+			detail.Visible = true
+			TweenService:Create(detail, TweenInfo.new(0.15, Enum.EasingStyle.Quad), { Position = target }):Play()
+		else
+			detail.Position = target
+		end
 	end
 
 	render = function()
@@ -228,11 +276,12 @@ function InventoryUI.build(panel)
 		message.Text = vm.message or ""
 		message.Visible = vm.message ~= nil
 		clear(grid)
+		table.clear(cardFrames)
 		local found = nil
 		for i, card in ipairs(vm.cards) do
 			local def = Units.get(card.unitId)
 			local rc = rarityColor(card.rarity)
-			local isSel = card.uid == selected
+			local isSel = card.uid == sel.get()
 			if isSel then
 				found = card
 			end
@@ -259,16 +308,17 @@ function InventoryUI.build(panel)
 			Shape.tooltip(ts, card.trait and card.trait.name or "No trait", card.trait and W.YELLOW or U.BORDER)
 			-- name: big, bottom-right, over the portrait
 			Theme.label({ Text = card.name, Size = UDim2.new(1, -12, 0, 22), Position = UDim2.new(0, 6, 1, -26), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 26 }, c)
+			table.insert(cardFrames, c)
 			c.Activated:Connect(function()
-				selected = card.uid
+				sel.select(card.uid) -- same card again toggles closed
 				render()
 			end)
 		end
 		if found then
 			openDetail(found)
 		else
-			selected = nil
-			detail.Visible = false
+			sel.close()
+			detail.Visible, tip.Visible = false, false
 		end
 	end
 
@@ -277,7 +327,8 @@ function InventoryUI.build(panel)
 	end)
 	root:GetPropertyChangedSignal("Visible"):Connect(function()
 		if not root.Visible then -- closing (X / Esc / another panel) resets to the grid
-			view.Visible, selected = false, nil
+			view.Visible = false
+			sel.close()
 			showGrid(true)
 			Log.try("Inventory", "render", render)
 		end

@@ -114,4 +114,23 @@ function InventoryView.newLocks()
 	}
 end
 
+-- Detail selection: select(uid) opens, selecting the open uid again closes; close() clears.
+function InventoryView.newSelection()
+	local cur = nil
+	return {
+		select = function(uid)
+			cur = (cur ~= uid) and uid or nil
+			return cur
+		end,
+		close = function()
+			local was = cur ~= nil
+			cur = nil
+			return was
+		end,
+		get = function()
+			return cur
+		end,
+	}
+end
+
 return InventoryView
