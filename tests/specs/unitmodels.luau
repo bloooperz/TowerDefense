@@ -45,7 +45,7 @@ return function(t)
 	end)
 	t.test("Basic placeholder: original dark-haired summoner (parts, colors, blade)", function()
 		local b = UM.PLACEHOLDERS.Basic
-		t.eq(#b.parts >= 15 and #b.parts <= 25, true)
+		t.eq(#b.parts >= 40 and #b.parts <= 70, true)
 		local pal = b.palette
 		t.eq(pal.skin[1] >= 220 and pal.skin[2] >= 200, true) -- pale
 		t.eq(pal.hair[1] <= 30 and pal.hair[2] <= 30 and pal.hair[3] <= 30, true) -- near-black
@@ -57,9 +57,14 @@ return function(t)
 			if p.shape == "wedge" then wedges += 1 end
 		end
 		t.eq(by.Head.color, "skin"); t.eq(by.LeftHand.color, "skin"); t.eq(by.RightHand.color, "skin")
-		t.eq(by.Torso.color, "jacket"); t.eq(by.Collar.color, "jacket"); t.eq(by.LeftLeg.color, "pants")
-		t.eq(by.Blade.color, "blade"); t.eq(by.Handle ~= nil and by.Guard ~= nil, true)
-		t.eq(hair >= 6, true); t.eq(wedges >= 3, true)
+		t.eq(by.Torso.color, "jacket"); t.eq(by.CollarBack.color, "jacket"); t.eq(by.LeftLeg.color, "pants")
+		t.eq(by.Blade1.color, "blade"); t.eq(by.Guard ~= nil, true)
+		t.eq(hair >= 15, true); t.eq(wedges >= 12, true)
+		local function count(prefix) local n = 0 for name in pairs(by) do if name:sub(1, #prefix) == prefix then n += 1 end end return n end
+		t.eq(count("Blade") >= 3, true); t.eq(count("Fuller") >= 3, true); t.eq(count("Wrap") >= 4, true); t.eq(count("Button") >= 3, true)
+		t.eq(by.Blade1.rot[1] ~= by.Blade3.rot[1], true) -- curved: angled segments
+		t.eq(by.Pommel ~= nil and by.Buckle ~= nil and by.Hem ~= nil and by.LeftCuff ~= nil and by.LeftPantCuff ~= nil, true)
+		t.eq(count("Collar") >= 4 and count("Fringe") >= 4 and count("SpikeBack") >= 3, true)
 		t.eq(by.Rifle, nil); t.eq(by.Helmet, nil)
 		local src = fs.readFile("src/shared/UnitModels.luau")
 		t.eq(src:find("rbxassetid", 1, true), nil); t.eq(src:find("MeshPart", 1, true), nil)
