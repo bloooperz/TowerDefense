@@ -40,7 +40,7 @@ Net.DEFS = {
 	-- Studio-only dev menu (server/Dev.luau). studioOnly remotes are NOT created outside Studio.
 	DevSandbox = { dir = "c2s", args = { "string", "string", "number", "number", "number", "number", "Vector3" }, rate = 4, studioOnly = true },
 	DevToggle = { dir = "c2s", args = { "string", "boolean" }, rate = 6, studioOnly = true },
-	DevSkipWave = { dir = "c2s", args = {}, rate = 2, studioOnly = true },
+	DevSkipWave = { dir = "c2s", args = {}, rate = 15, studioOnly = true }, -- burst 15, 15/s: fast clicking ok, loops capped
 	DevReset = { dir = "c2s", args = {}, rate = 2, studioOnly = true },
 	DevGrantUnitXp = { dir = "c2s", args = { "number" }, rate = 4, studioOnly = true }, -- to equipped units
 	DevGrantPlayerXp = { dir = "c2s", args = { "number" }, rate = 4, studioOnly = true },
@@ -82,19 +82,9 @@ function Net.validate(def, ...)
 end
 
 -- Token bucket per player per remote: capacity = rate, refills `rate` tokens per second.
-local buckets = {}
+local limiter = require(script.Parent.RateLimit).new()
 local function allow(plr, name, rate)
-	local key = plr.UserId .. ":" .. name
-	local now = os.clock()
-	local b = buckets[key] or { tokens = rate, t = now }
-	b.tokens = math.min(rate, b.tokens + (now - b.t) * rate)
-	b.t = now
-	buckets[key] = b
-	if b.tokens < 1 then
-		return false
-	end
-	b.tokens -= 1
-	return true
+	return limiter.allow(plr.UserId .. ":" .. name, rate, os.clock())
 end
 
 function Net.initServer()
@@ -120,7 +110,7 @@ function Net.initServer()
 	folder.Parent = RS
 	game:GetService("Players").PlayerRemoving:Connect(function(plr)
 		for name in pairs(Net.DEFS) do
-			buckets[plr.UserId .. ":" .. name] = nil
+			limiter.forget(plr.UserId .. ":" .. name)
 		end
 	end)
 end

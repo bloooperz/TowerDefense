@@ -40,6 +40,18 @@ local insidePortal = {} -- [player] = true while standing in the portal (edge de
 local offeredAt = {} -- [player] = os.clock() when we last offered pick/join (valid OFFER_WINDOW)
 local OFFER_WINDOW = 120
 
+-- Waits `sec` but returns early (true) when a dev skip bumps Match.dev.skipToken past `skipAt`.
+local function waitOrSkip(sec, skipAt)
+	local t0 = os.clock()
+	while os.clock() - t0 < sec do
+		if Match.dev.skipToken ~= skipAt then
+			return true
+		end
+		task.wait(math.min(0.05, sec))
+	end
+	return Match.dev.skipToken ~= skipAt
+end
+
 local function count(t)
 	local n = 0
 	for _ in pairs(t) do
@@ -342,11 +354,14 @@ local function runWavesInner()
 					log.error("wave", wave, "unknown enemy id", g.enemy)
 					enemiesLeft = math.max(enemiesLeft - 1, 0)
 				end
-				task.wait(g.delay)
+				waitOrSkip(g.delay, skipAt) -- dev skip interrupts the spawn gap
 			end
 		end
 		repeat
-			task.wait(0.25)
+			if Match.dev.skipToken ~= skipAt then
+				EnemySim.clear() -- skip landed after spawning finished
+			end
+			task.wait(Match.dev.skipToken ~= skipAt and 0 or 0.25)
 		until EnemySim.count() == 0 or not live()
 		if not live() then
 			break
@@ -356,7 +371,7 @@ local function runWavesInner()
 		if mode.maxWaves and wave >= mode.maxWaves then
 			break
 		end
-		task.wait(Config.WAVE_BREAK)
+		waitOrSkip(Config.WAVE_BREAK, Match.dev.skipToken) -- dev skip during the break starts the next wave now
 	end
 	if matchToken ~= myToken then
 		return -- restarted/reset while we were running; the new match owns state now
