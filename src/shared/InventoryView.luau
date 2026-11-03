@@ -6,7 +6,9 @@ local Limits = if script then require(script.Parent.Limits) else require("./Limi
 
 InventoryView.MAX_UNITS = Limits.MAX_UNITS -- header "Units: N/100"; same cap the server enforces
 InventoryView.MAX_LEVEL = 80
-InventoryView.ACTIONS = { "Equip", "Sell", "Lock", "View" } -- detail buttons, top -> bottom
+InventoryView.ACTIONS = { "Equip", "Sell", "Lock", "View", "Feed", "Fuse" } -- detail buttons, top -> bottom
+-- actions that only toast "coming soon" (no server call; Feed/Fuse logic not wired yet)
+InventoryView.COMING_SOON = { Equip = true, Sell = true, Feed = true, Fuse = true }
 InventoryView.LOADING = "Loading units..."
 InventoryView.EMPTY = "No units yet - summon some!"
 

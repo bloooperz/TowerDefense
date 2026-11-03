@@ -1,4 +1,4 @@
--- Lobby Inventory ("Collection") panel. UI ONLY: Equip / Sell show a "Coming soon" toast,
+-- Lobby Units panel (K): Collection grid + detail sidebar. UI ONLY: Equip / Sell / Feed / Fuse show a "coming soon" toast,
 -- Lock is a client-side visual toggle, View shows a spinnable 3D portrait + stats as stored.
 -- Data: the server's `Inventory` attribute (JSON). Layout/text decided by shared/InventoryView.
 local Players = game:GetService("Players")
@@ -21,9 +21,9 @@ local log = Log.new("Inventory")
 local player = Players.LocalPlayer
 local U = Theme.Unit
 local W = Theme.World
-local InventoryUI = {}
+local UnitsUI = {}
 
-local BTN_COLORS = { Equip = W.YELLOW, Sell = W.RED, Lock = Color3.fromRGB(110, 116, 128), View = W.ORANGE }
+local BTN_COLORS = { Equip = W.YELLOW, Sell = W.RED, Lock = Color3.fromRGB(110, 116, 128), View = W.ORANGE, Feed = W.GREEN, Fuse = W.BLUE }
 local CARD_W, CARD_H = 100, 96 -- near-square like the reference
 
 local function decode()
@@ -59,13 +59,13 @@ local function bigButton(text, color, parent, order)
 	return b
 end
 
-function InventoryUI.build(panel)
+function UnitsUI.build(panel)
 	local root = panel.root
 	root.Size = UDim2.fromOffset(6 * (CARD_W + 8) + 44, 470)
 	root.AnchorPoint, root.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5) -- always centered; detail overlays
 	panel.body.Visible = false
 	if panel.title then
-		panel.title.Text = "Collection"
+		panel.title.Text = "Units"
 	end
 	local locks = InventoryView.newLocks()
 	local sel = InventoryView.newSelection()
@@ -84,7 +84,7 @@ function InventoryUI.build(panel)
 	local DETAIL_W = 260
 	local detail = Theme.make("Frame", { Position = UDim2.new(1, 12, 0, 0), Size = UDim2.fromOffset(DETAIL_W, 470), Visible = false, ZIndex = 30 }, root)
 	Theme.panel(detail, U.BORDER, Theme.Unit)
-	local dlist = Theme.make("Frame", { Position = UDim2.fromOffset(14, 14), Size = UDim2.new(1, -28, 1, -28), BackgroundTransparency = 1, ZIndex = 31 }, detail)
+	local dlist = Theme.make("ScrollingFrame", { Position = UDim2.fromOffset(14, 14), Size = UDim2.new(1, -28, 1, -28), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 4, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 31 }, detail) -- scrolls: 6 action buttons
 	Theme.make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, dlist)
 	local tip = Theme.make("Frame", { Position = UDim2.new(1, 10, 0, 90), Size = UDim2.fromOffset(230, 110), Visible = false, ZIndex = 34 }, detail)
 	Theme.panel(tip, W.BLUE, Theme.Unit) -- dark box, thick colored border
@@ -220,7 +220,7 @@ function InventoryUI.build(panel)
 			local b = bigButton(bdef.text, BTN_COLORS[bdef.action], dlist, 10 + i)
 			b.Name = bdef.action .. "Button"
 			b.Activated:Connect(function()
-				if bdef.action == "Equip" or bdef.action == "Sell" then
+				if InventoryView.COMING_SOON[bdef.action] then
 					Toast.show(bdef.text .. ": coming soon", "info")
 				elseif bdef.action == "Lock" then
 					locks.toggle(card.uid)
@@ -313,4 +313,4 @@ function InventoryUI.build(panel)
 	Log.try("Inventory", "render", render)
 end
 
-return InventoryUI
+return UnitsUI

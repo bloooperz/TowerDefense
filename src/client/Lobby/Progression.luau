@@ -1,8 +1,7 @@
 -- Lobby leveling UI, built into existing lobby panels:
---  * Units panel: owned unit list -> level, XP bar, damage multiplier, Feed (XP food) and Fuse.
 --  * Profile panel: player level/XP, level-gated unlocks, milestone claim list.
--- Read-only views of server attributes (Inventory / Items / Milestones / Level / Xp); every
--- action goes through a validated remote (UseItem / FuseUnits / ClaimMilestone).
+-- Read-only views of server attributes (Milestones / Level / Xp); every
+-- action goes through a validated remote (ClaimMilestone).
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
@@ -92,158 +91,7 @@ local function bar(parent, props, color)
 	return fill, txt
 end
 
------------------------------------------------------------------- Units panel
-local function buildUnits(panel)
-	panel.root.Size = UDim2.fromOffset(680, 440)
-	panel.body.Visible = false
-	local root = panel.root
-	local left = list(root, { Position = UDim2.fromOffset(20, 60), Size = UDim2.new(0, 230, 1, -80) })
-	local right = Theme.make("Frame", { Position = UDim2.fromOffset(264, 60), Size = UDim2.new(1, -284, 1, -80), BackgroundTransparency = 1, ZIndex = 22 }, root)
-	Theme.make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, right)
-	local selected = nil
-	local fuseSel = {}
-	local sellArm = nil -- uid armed for a Mythic+ sell confirm
-
-	local function render()
-		local inv = decode("Inventory", {})
-		local items = decode("Items", {})
-		local byUid = {}
-		for _, u in ipairs(inv) do
-			byUid[u.uid] = u
-		end
-		if selected and not byUid[selected] then
-			selected = nil -- fused away
-		end
-		table.sort(inv, function(a, b)
-			if a.equipped ~= b.equipped then
-				return a.equipped
-			end
-			if a.level ~= b.level then
-				return a.level > b.level
-			end
-			return a.uid < b.uid
-		end)
-		selected = selected or (inv[1] and inv[1].uid)
-		clear(left)
-		for i, u in ipairs(inv) do
-			local def = Units.get(u.unitId)
-			local rarity = def and Config.RARITY_COLORS[def.rarity or "Common"] or U.BORDER
-			local b = btn(("%s  Lv %d%s"):format(def and def.name or u.unitId, u.level, u.equipped and "  [E]" or ""), u.uid == selected and U.BORDER or U.BASE, left, { LayoutOrder = i, TextXAlignment = Enum.TextXAlignment.Left })
-			Shape.get(b).setEdge(rarity, u.uid == selected and 3 or 2)
-			b.Activated:Connect(function()
-				selected, fuseSel = u.uid, {}
-				render()
-			end)
-		end
-
-		clear(right)
-		local u = selected and byUid[selected]
-		if not u then
-			label("No units owned", right)
-			return
-		end
-		local def = Units.get(u.unitId)
-		label(("%s%s"):format(def and def.name or u.unitId, u.trait and ("  [" .. tostring(u.trait) .. "]") or ""), right, { Font = Theme.FONT, Size = UDim2.new(1, 0, 0, 28), LayoutOrder = 1 })
-		local need = UnitLevel.xpToNext(u.level)
-		local fill, txt = bar(right, { Size = UDim2.new(1, 0, 0, 24), LayoutOrder = 2 }, Theme.World.YELLOW)
-		fill.Size = UDim2.fromScale(need > 0 and math.clamp(u.xp / need, 0, 1) or 1, 1)
-		txt.Text = need > 0 and ("Lv %d / %d   %d / %d XP"):format(u.level, UnitLevel.MAX, u.xp, need) or ("Lv %d MAX"):format(u.level)
-		local nextMult = u.level < UnitLevel.MAX and (" (next Lv: x%.2f)"):format(UnitLevel.damageMult(u.level + 1)) or ""
-		label(("Damage x%.2f%s   (rate/range unaffected)"):format(UnitLevel.damageMult(u.level), nextMult), right, { LayoutOrder = 3, TextColor3 = U.MUTED })
-		if def then
-			label(("Base damage %g -> %.1f at this level"):format(def.damage, def.damage * UnitLevel.damageMult(u.level)), right, { LayoutOrder = 4, TextColor3 = U.MUTED })
-		end
-
-		label("FEED XP FOOD", right, { LayoutOrder = 10, Font = Theme.FONT })
-		local feedRow = Theme.make("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, LayoutOrder = 11, ZIndex = 22 }, right)
-		Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6) }, feedRow)
-		for _, it in ipairs(Items.LIST) do
-			local have = items[it.id] or 0
-			local b = btn(("%s x%d (+%d)"):format(it.name, have, it.xp), have > 0 and Theme.World.GREEN or Color3.fromRGB(70, 74, 82), feedRow, { Size = UDim2.new(1 / #Items.LIST, -4, 1, 0) })
-			b.Activated:Connect(function()
-				if have <= 0 then
-					Toast.show(("No %s - earn them from milestones"):format(it.name), "error")
-					return
-				end
-				if u.level >= UnitLevel.MAX then
-					Toast.show("Unit is already max level", "error")
-					return
-				end
-				Net.send("UseItem", u.uid, it.id, 1)
-			end)
-		end
-
-		local fuseNeed = PlayerLevel.required("Fuse")
-		local plv = player:GetAttribute("Level") or 1
-		label(("FUSE DUPLICATES%s"):format(plv < fuseNeed and ("  (unlocks at player Lv %d)"):format(fuseNeed) or ""), right, { LayoutOrder = 20, Font = Theme.FONT })
-		local dupes = list(right, { Size = UDim2.new(1, 0, 0, 96), LayoutOrder = 21 })
-		local nDupes, total = 0, 0
-		for _, d in ipairs(inv) do
-			if d.unitId == u.unitId and d.uid ~= u.uid and not d.equipped then
-				nDupes += 1
-				local on = fuseSel[d.uid] == true
-				local value = UnitLevel.fuseValue(d)
-				if on then
-					total += value
-				end
-				local b = btn(("%s Lv %d  (+%d XP)%s"):format(def and def.name or d.unitId, d.level, value, on and "  SELECTED" or ""), on and Theme.World.ORANGE or U.BASE, dupes, { LayoutOrder = nDupes, Size = UDim2.new(1, 0, 0, 26), TextXAlignment = Enum.TextXAlignment.Left })
-				b.Activated:Connect(function()
-					fuseSel[d.uid] = not on or nil
-					render()
-				end)
-			end
-		end
-		if nDupes == 0 then
-			label("No unequipped duplicates of this unit", dupes, { TextColor3 = U.MUTED })
-		end
-		local picked = {}
-		for uid in pairs(fuseSel) do
-			table.insert(picked, uid)
-		end
-		local fb = btn(("Fuse %d selected (+%d XP)"):format(#picked, total), #picked > 0 and Theme.World.RED or Color3.fromRGB(70, 74, 82), right, { LayoutOrder = 22, Size = UDim2.new(1, 0, 0, 34) })
-		fb.Activated:Connect(function()
-			if #picked == 0 then
-				Toast.show("Select duplicates to fuse first", "error")
-				return
-			end
-			Net.send("FuseUnits", u.uid, table.concat(picked, ","))
-			fuseSel = {}
-		end)
-
-		-- Sell for Gold. Server re-validates everything (equipped/placed/locked/last unit).
-		local rarity = def and def.rarity or "Common"
-		local gold = Summon.SELL_GOLD[rarity] or 0
-		local needConfirm = Summon.rank(rarity) >= Summon.rank(Summon.CONFIRM_FROM)
-		local armed = sellArm == u.uid
-		local sb = btn(armed and ("Confirm: sell %s for %d Gold?"):format(rarity, gold) or (u.equipped and "Sell (unequip from hotbar first)" or ("Sell for %d Gold"):format(gold)), armed and Theme.World.RED or (u.equipped and Color3.fromRGB(70, 74, 82) or Theme.World.ORANGE), right, { LayoutOrder = 30, Size = UDim2.new(1, 0, 0, 34) })
-		sb.Activated:Connect(function()
-			if u.equipped then
-				Toast.show("Can't sell a unit on your hotbar", "error")
-				return
-			end
-			if needConfirm and sellArm ~= u.uid then
-				sellArm = u.uid
-				render()
-				task.delay(3, function()
-					if sellArm == u.uid then
-						sellArm = nil
-						Log.try("Progression", "units render", render)
-					end
-				end)
-				return
-			end
-			sellArm = nil
-			Net.send("SellOwnedUnit", u.uid)
-		end)
-	end
-
-	for _, a in ipairs({ "Inventory", "Items", "Level" }) do
-		player:GetAttributeChangedSignal(a):Connect(function()
-			Log.try("Progression", "units render", render)
-		end)
-	end
-	Log.try("Progression", "units render", render)
-end
+-- (Units panel moved to Lobby/UnitsUI: Collection grid + detail sidebar with Feed/Fuse.)
 
 ------------------------------------------------------------------ Profile panel
 local function rewardText(m)
@@ -320,9 +168,6 @@ local function buildProfile(panel)
 end
 
 function Progression.build(panels)
-	if panels.Units then
-		Log.try("Progression", "build Units", buildUnits, panels.Units)
-	end
 	if panels.Profile then
 		Log.try("Progression", "build Profile", buildProfile, panels.Profile)
 	end

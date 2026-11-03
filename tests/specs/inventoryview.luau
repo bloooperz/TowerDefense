@@ -25,11 +25,11 @@ return function(t)
 	t.test("empty inventory message", function()
 		t.eq(IV.cards({}, get, traits).message, IV.EMPTY)
 	end)
-	t.test("detail has exactly Equip/Sell/Lock/View", function()
+	t.test("detail has exactly Equip/Sell/Lock/View/Feed/Fuse", function()
 		local card = IV.cards({ { uid = "a", unitId = "basic", level = 5, trait = "Sharp" } }, get, traits).cards[1]
 		local d = IV.detail(card, defs.basic, false)
-		t.eq(#d.buttons, 4)
-		for i, a in ipairs({ "Equip", "Sell", "Lock", "View" }) do t.eq(d.buttons[i].action, a) end
+		t.eq(#d.buttons, 6)
+		for i, a in ipairs({ "Equip", "Sell", "Lock", "View", "Feed", "Fuse" }) do t.eq(d.buttons[i].action, a) end
 		t.eq(d.buttons[1].text, "Equip"); t.eq(d.levelText, "Lvl 5/80")
 		t.eq(d.stats[1].value, "20"); t.eq(d.stats[2].value, "0.5s"); t.eq(d.stats[3].value, "18")
 		t.eq(d.traitText, "Sharp"); t.eq(d.trait.desc, "Hits harder.")

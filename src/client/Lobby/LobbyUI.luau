@@ -225,7 +225,8 @@ function LobbyUI.init()
 	watchCircles()
 	require(script.Parent.Progression).build(panels)
 	require(script.Parent.SummonUI).build(panels.Summon)
-	require(script.Parent.InventoryUI).build(panels.Inventory)
+	require(script.Parent.UnitsUI).build(panels.Units) -- K: units (Collection grid + sidebar)
+	require(script.Parent.ItemsUI).build(panels.Inventory) -- I: items/materials
 
 	sidePanel(LEFT, 0, 0)
 	sidePanel(RIGHT, 1, 1)
