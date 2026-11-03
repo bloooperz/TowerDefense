@@ -26,7 +26,7 @@ Net.DEFS = {
 	UseItem = { dir = "c2s", args = { "string", "string", "number" }, rate = 4 }, -- (unitUid, itemId, count) XP food
 	FuseUnits = { dir = "c2s", args = { "string", "string" }, rate = 2, maxLen = 2000 }, -- (targetUid, "uid,uid,...")
 	ClaimMilestone = { dir = "c2s", args = { "number" }, rate = 3 },
-	Summon = { dir = "c2s", args = { "number" }, rate = 1 }, -- (tier 1/10/50) shared/Summon
+	Summon = { dir = "c2s", args = { "number" }, rate = 10 }, -- (tier 1/10/50) anti-flood only; pacing = Summon.COOLDOWN (0.5s, silent)
 	ClaimStarter = { dir = "c2s", args = { "string" }, rate = 1 }, -- (unitId) first-load starter pick
 	SellOwnedUnit = { dir = "c2s", args = { "string" }, rate = 4 }, -- (unitUid) sell owned unit for Gold
 	ClaimStarterResult = { dir = "s2c" }, -- (ok: boolean, reason: string?) explicit reply to ClaimStarter

@@ -58,7 +58,7 @@ function SummonUI.build(panel)
 
 	local row = Theme.make("Frame", { Position = UDim2.fromOffset(20, 244), Size = UDim2.new(1, -40, 0, 48), BackgroundTransparency = 1, ZIndex = 22 }, root)
 	Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, row)
-	local busy = false
+	local busy, lastSent = false, nil
 	local clicks = SummonReveal.clicks()
 	local showing, dismiss = function() return false end, function() end -- set once the popup exists
 	for i, tier in ipairs(Summon.TIERS) do
@@ -72,14 +72,14 @@ function SummonUI.build(panel)
 				dismiss()
 				return
 			end
-			if busy then
-				return
+			if busy or not Summon.cooldownReady(lastSent, os.clock()) then
+				return -- buttons inert for Summon.COOLDOWN after a summon (server enforces too)
 			end
 			if (player:GetAttribute("Gems") or 0) < cost then
 				Toast.show(("Not enough Gems (need %d)"):format(cost), "error")
 				return
 			end
-			busy = true
+			busy, lastSent = true, os.clock()
 			task.delay(1.5, function()
 				busy = false -- re-armed by result too; this only covers a lost reply
 			end)

@@ -139,6 +139,13 @@ function Summon.roll(banner, pity: number, rand: () -> number)
 	return id, rarity, pity
 end
 
+-- Anime Vanguards-style short delay between summons (server-enforced, silent; client disables
+-- the buttons for the same time). Replaces the old Net rate = 1 hard limit.
+Summon.COOLDOWN = 0.5
+function Summon.cooldownReady(lastAt: number?, now: number): boolean
+	return lastAt == nil or now - lastAt >= Summon.COOLDOWN
+end
+
 -- nil if OK, else player-facing reason. Returns cost too.
 function Summon.check(tier: any, gems: number?): (string?, number)
 	if type(tier) ~= "number" or not table.find(Summon.TIERS, tier) then

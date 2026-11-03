@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
+local Summon = require(Shared.Summon)
 local Maps = require(Shared.Maps)
 local Modes = require(Shared.Modes)
 local Enemies = require(Shared.Enemies)
@@ -687,11 +688,19 @@ function Match.init(infoFolder)
 		return nil
 	end)
 
+	local lastSummon = {} -- [userId] = os.clock() of the last successful summon
+	Players.PlayerRemoving:Connect(function(p)
+		lastSummon[p.UserId] = nil
+	end)
 	Net.on("Summon", function(plr, tier)
+		if not Summon.cooldownReady(lastSummon[plr.UserId], os.clock()) then
+			return nil -- inside the 0.5s cooldown: silently ignored (no toast)
+		end
 		local why, results, back = PlayerData.summon(plr, tier)
 		if why then
 			return why
 		end
+		lastSummon[plr.UserId] = os.clock()
 		local d = PlayerData.get(plr)
 		Net.fire("SummonResult", plr, { results = results, gems = d and d.gems or 0, gold = d and d.gold or 0, pity = d and d.summonPity or 0, back = back })
 		return nil
