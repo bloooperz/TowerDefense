@@ -45,7 +45,7 @@ return function(t)
 	end)
 	t.test("Basic placeholder: stocky dark-haired summoner (mix, colors, proportions, blade)", function()
 		local b = UM.PLACEHOLDERS.Basic
-		t.eq(#b.parts >= 40 and #b.parts <= 70, true)
+		t.eq(#b.parts >= 120 and #b.parts <= 150, true)
 		local pal = b.palette
 		t.eq(pal.skin[1] >= 220 and pal.skin[2] >= 200, true)
 		t.eq(table.concat(pal.hair, ","), "18,18,22"); t.eq(table.concat(pal.jacket, ","), "38,40,52")
@@ -62,8 +62,21 @@ return function(t)
 				if p.name:find("Spike") or p.name:find("Fringe") then t.eq(p.shape, "wedge"); t.eq(p.size[2] <= 0.45, true) end
 			end
 		end
-		t.eq(kinds.block >= 20 and kinds.wedge >= 10 and kinds.cylinder >= 5, true)
+		t.eq(kinds.block >= 40 and kinds.wedge >= 60 and kinds.cylinder >= 5, true)
 		t.eq(hx1 - hx0 > hy1 - hy0, true) -- hair wider than tall
+		for _, n in ipairs({ "SpikeTop1", "SpikeOutL1", "SpikeBack4" }) do
+			t.eq(by[n .. "b"] ~= nil and by[n .. "c"] ~= nil, true) -- stacked
+			t.eq(by[n .. "c"].size[2] < by[n].size[2], true) -- tapering
+		end
+		local sleeveWedges = 0
+		for _, p in ipairs(b.parts) do
+			if p.name:find("^LeftSleeve") and p.shape == "wedge" then sleeveWedges += 1 end
+		end
+		t.eq(sleeveWedges >= 6 and sleeveWedges <= 8, true)
+		t.eq(by.LeftKneeFront.shape, "wedge"); t.eq(by.LeftPantCuffBack.shape, "wedge")
+		t.eq(by.LapelLUpper ~= nil and by.BackSeam ~= nil and by.SideFoldL ~= nil, true)
+		t.eq(by.Blade6 ~= nil and by.Blade6.shape == "wedge" and by.Blade7 == nil, true)
+		t.eq(by.Blade1.size[1], 0.2)
 		t.eq(by.SpikeOutL1 ~= nil and by.SpikeOutR2 ~= nil, true)
 		local function span(name) return math.abs(by[name].pos[1]) + by[name].size[1] / 2 end
 		local ratio = 2 * span("LeftShoulder") / by.Belt.size[1]
@@ -75,10 +88,11 @@ return function(t)
 		t.eq(by.LeftCuff.color, "trim"); t.eq(by.Hem.color, "trim"); t.eq(by.CollarEdge.color, "trim")
 		t.eq(by.Head.color, "skin"); t.eq(by.LeftHand.color, "skin"); t.eq(by.Torso.color, "jacket")
 		t.eq(by.Blade1.size[1], 0.2); t.eq(by.Guard.size[1] >= 0.8, true)
-		t.eq(by.Blade1.rot[1] ~= by.Blade3.rot[1], true); t.eq(by.Blade1.rot[2] ~= 0, true) -- curved, out to the side
+		t.eq(by.Blade1.rot[1] ~= by.Blade6.rot[1], true); t.eq(by.Blade1.rot[2] ~= 0, true) -- curved, out to the side
 		t.eq(by.Rifle, nil); t.eq(by.Helmet, nil)
 		local src = fs.readFile("src/shared/UnitModels.luau")
 		t.eq(src:find("rbxassetid", 1, true), nil); t.eq(src:find("MeshPart", 1, true), nil)
 		t.eq(src:find("Enum.PartType.Cylinder", 1, true) ~= nil, true)
+		t.eq(src:find("d.CastShadow = false", 1, true) ~= nil, true)
 	end)
 end
