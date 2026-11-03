@@ -1,8 +1,10 @@
 -- PURE view-model for the lobby Inventory ("Collection") panel. UI-only: no server actions.
 -- Maps the replicated `Inventory` attribute (decoded JSON list) to grid cards + a detail view.
--- Stats are shown exactly as stored on the unit def (no derived numbers / percentages).
+-- Stats are the unit def's values; DAMAGE includes the owned unit's level multiplier
+-- (UnitLevel.damageMult, same as in-match Towers). Range/cooldown don't scale with level.
 local InventoryView = {}
 local Limits = if script then require(script.Parent.Limits) else require("./Limits") -- Roblox | lune
+local UnitLevel = if script then require(script.Parent.UnitLevel) else require("./UnitLevel")
 
 InventoryView.MAX_UNITS = Limits.MAX_UNITS -- header "Units: N/100"; same cap the server enforces
 InventoryView.MAX_LEVEL = 80
@@ -67,11 +69,11 @@ function InventoryView.cards(inv, getDef, traitsById)
 	}
 end
 
--- Detail panel model for one card. Stat chips read the def's base values as-is.
+-- Detail panel model for one card. Damage chip is leveled; other chips are the def's base values.
 function InventoryView.detail(card, def, locked)
 	local stats = {}
 	if def then
-		table.insert(stats, { key = "damage", label = "Damage", value = tostring(def.damage) })
+		table.insert(stats, { key = "damage", label = "Damage", value = UnitLevel.displayDamage(def.damage, card.level) })
 		table.insert(stats, { key = "rate", label = "Cooldown", value = tostring(def.rate) .. "s" })
 		table.insert(stats, { key = "range", label = "Range", value = tostring(def.range) })
 	end

@@ -38,6 +38,14 @@ function UnitLevel.applyDamage(stats, level: number?, overrides)
 	return out
 end
 
+-- Leveled damage as shown in lobby UI: one decimal, trailing ".0" dropped (20 -> "20",
+-- L4 Basic 20 * 1.0896 -> "21.8"). Same multiplier the server applies in Towers.
+function UnitLevel.displayDamage(base: number, level: number?): string
+	local v = math.floor(base * UnitLevel.damageMult(level) * 10 + 0.5) / 10
+	local str = ("%.1f"):format(v)
+	return (str:gsub("%.0$", ""))
+end
+
 -- XP needed to advance from `level` to level + 1; 0 at max.
 function UnitLevel.xpToNext(level: number): number
 	local l = UnitLevel.clampLevel(level)

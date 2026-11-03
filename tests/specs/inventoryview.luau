@@ -31,9 +31,16 @@ return function(t)
 		t.eq(#d.buttons, 6)
 		for i, a in ipairs({ "Equip", "Sell", "Lock", "View", "Feed", "Fuse" }) do t.eq(d.buttons[i].action, a) end
 		t.eq(d.buttons[1].text, "Equip"); t.eq(d.levelText, "Lvl 5/80")
-		t.eq(d.stats[1].value, "20"); t.eq(d.stats[2].value, "0.5s"); t.eq(d.stats[3].value, "18")
+		t.eq(d.stats[1].value, "22.5"); t.eq(d.stats[2].value, "0.5s"); t.eq(d.stats[3].value, "18")
 		t.eq(d.traitText, "Sharp"); t.eq(d.trait.desc, "Hits harder.")
 		t.eq(d.extra[1].label, "Role")
+	end)
+	t.test("detail damage scales with owned level (L1 base, L4 > base); rate/range unchanged", function()
+		local c1 = IV.cards({ { uid = "a", unitId = "basic", level = 1 } }, get, traits).cards[1]
+		local c4 = IV.cards({ { uid = "b", unitId = "basic", level = 4 } }, get, traits).cards[1]
+		local d1, d4 = IV.detail(c1, defs.basic, false), IV.detail(c4, defs.basic, false)
+		t.eq(d1.stats[1].value, "20"); t.eq(d4.stats[1].value, "21.8")
+		t.eq(d4.stats[2].value, "0.5s"); t.eq(d4.stats[3].value, "18")
 	end)
 	t.test("equipped shows Unequip label; no trait -> blank-safe", function()
 		local card = IV.cards({ { uid = "z", unitId = "sniper", level = 1, equipped = true } }, get, traits).cards[1]
