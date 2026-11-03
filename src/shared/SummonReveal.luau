@@ -93,4 +93,25 @@ function SummonReveal.sequence(results, skipAnim)
 	return s
 end
 
+-- Click routing while the reveal/summary is up. target: "model" (unit viewport, drag-to-spin),
+-- "button" (Next/Skip: their own action), "other" (anywhere else on the popup).
+-- Dismiss fires on RELEASE so a drag that started on a model never dismisses.
+function SummonReveal.clicks()
+	local c = { pressed = nil }
+	function c.press(target)
+		c.pressed = target
+	end
+	function c.release(showing): boolean -- true = dismiss now
+		local p = c.pressed
+		c.pressed = nil
+		return showing == true and p == "other"
+	end
+	-- x1/x10/x50 click: while results show it ONLY dismisses; hidden -> summon.
+	function c.summonClick(showing): string
+		c.pressed = nil
+		return showing and "dismiss" or "summon"
+	end
+	return c
+end
+
 return SummonReveal

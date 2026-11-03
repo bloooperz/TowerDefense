@@ -59,6 +59,8 @@ function SummonUI.build(panel)
 	local row = Theme.make("Frame", { Position = UDim2.fromOffset(20, 244), Size = UDim2.new(1, -40, 0, 48), BackgroundTransparency = 1, ZIndex = 22 }, root)
 	Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, row)
 	local busy = false
+	local clicks = SummonReveal.clicks()
+	local showing, dismiss = function() return false end, function() end -- set once the popup exists
 	for i, tier in ipairs(Summon.TIERS) do
 		local cost = tier * Summon.COST_PER_ROLL
 		local b = Theme.make("TextButton", { Text = ("Summon x%d  (%d Gems)"):format(tier, cost), Font = Theme.FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = W.BORDER_HOT, AutoButtonColor = false, Size = UDim2.fromOffset(170, 44), LayoutOrder = i, ZIndex = 23 }, row)
@@ -66,6 +68,10 @@ function SummonUI.build(panel)
 		Shape.outlineText(b, 2)
 		Theme.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8), PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6) }, b)
 		b.Activated:Connect(function()
+			if clicks.summonClick(showing()) == "dismiss" then
+				dismiss()
+				return
+			end
 			if busy then
 				return
 			end
@@ -98,9 +104,6 @@ function SummonUI.build(panel)
 	local gui = root.Parent
 	local pop = Theme.make("Frame", { Name = "SummonReveal", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(8, 6, 6), BackgroundTransparency = 0.25, Visible = false, Active = true, ZIndex = 60 }, gui)
 	local stage = Theme.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 61 }, pop)
-	local closeX = Theme.make("TextButton", { Text = "X", Font = Theme.FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), Size = UDim2.fromOffset(40, 40), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -20, 0, 20), ZIndex = 70 }, pop)
-	Theme.button(closeX, W.RED)
-	Theme.make("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5) }, closeX)
 	local seq, list = nil, {}
 
 	local function bigBtn(text, color, parent, props)
@@ -208,7 +211,6 @@ function SummonUI.build(panel)
 		for i, r in ipairs(list) do
 			resultCard(r, i, g)
 		end
-		bigBtn("Close", W.RED, box, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.fromOffset(160, 46) }).Activated:Connect(closePop)
 	end
 
 	render = function()
@@ -242,7 +244,52 @@ function SummonUI.build(panel)
 		Toast.show(("Summoned %d: kept %d, auto-sold %d (+%d Gold)"):format(#list, kept, sold, res.back or 0), "info")
 	end
 
-	closeX.Activated:Connect(closePop)
+	-- The popup is a full-screen Active frame above the panel, so it used to swallow clicks on the
+	-- summon buttons. While it shows, the button row is lifted INTO the popup (same screen spot,
+	-- top ZIndex) so x1/x10/x50 stay visible and clickable; it goes back on close.
+	local rowHome = { parent = row.Parent, pos = row.Position, z = row.ZIndex }
+	local function liftRow(on)
+		if on and row.Parent ~= pop then
+			local a, o = row.AbsolutePosition, pop.AbsolutePosition
+			row.Parent, row.Position, row.ZIndex = pop, UDim2.fromOffset(a.X - o.X, a.Y - o.Y), 80
+		elseif not on and row.Parent == pop then
+			row.Parent, row.Position, row.ZIndex = rowHome.parent, rowHome.pos, rowHome.z
+		end
+	end
+	showing = function()
+		return pop.Visible and seq ~= nil
+	end
+	dismiss = function()
+		closePop()
+	end
+	pop:GetPropertyChangedSignal("Visible"):Connect(function()
+		liftRow(pop.Visible)
+	end)
+	local function isPress(i)
+		return i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch
+	end
+	local function classify(pos)
+		for _, o in ipairs(player.PlayerGui:GetGuiObjectsAtPosition(pos.X, pos.Y)) do
+			if o:IsDescendantOf(pop) then
+				if o:IsA("ViewportFrame") then
+					return "model"
+				elseif o:IsA("GuiButton") then
+					return "button" -- Next/Skip/summon row act on their own
+				end
+			end
+		end
+		return "other"
+	end
+	UserInputService.InputBegan:Connect(function(i)
+		if isPress(i) and showing() then
+			clicks.press(classify(i.Position))
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(i)
+		if isPress(i) and clicks.release(showing()) then
+			Log.try("SummonUI", "dismiss reveal", closePop)
+		end
+	end)
 	panel.onEsc = closePop -- Esc closes the reveal first, then the panel
 	UserInputService.InputBegan:Connect(function(i, gpe)
 		if not gpe and i.KeyCode == Enum.KeyCode.Space and pop.Visible and seq and seq.mode == "reveal" then
