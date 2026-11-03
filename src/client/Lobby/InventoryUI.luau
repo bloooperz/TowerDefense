@@ -23,7 +23,7 @@ local W = Theme.World
 local InventoryUI = {}
 
 local BTN_COLORS = { Equip = W.YELLOW, Sell = W.RED, Lock = Color3.fromRGB(110, 116, 128), View = W.ORANGE }
-local CARD_W, CARD_H = 92, 116
+local CARD_W, CARD_H = 100, 96 -- near-square like the reference
 
 local function decode()
 	local raw = player:GetAttribute("Inventory")
@@ -93,11 +93,12 @@ function InventoryUI.build(panel)
 	local selected = nil
 	local tipOpen = false
 
-	local header = Theme.label({ Text = "Units: -/" .. InventoryView.MAX_UNITS, Size = UDim2.fromOffset(200, 26), Position = UDim2.fromOffset(20, 56), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 }, root)
+	local headerKey = Theme.label({ Text = "Units:", Size = UDim2.fromOffset(80, 24), Position = UDim2.fromOffset(24, 58), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = W.MUTED, ZIndex = 22 }, root)
+	local header = Theme.label({ Text = "-/" .. InventoryView.MAX_UNITS, Size = UDim2.fromOffset(110, 24), Position = UDim2.fromOffset(110, 58), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 }, root)
 	local grid = Theme.make("ScrollingFrame", { Position = UDim2.fromOffset(16, 88), Size = UDim2.new(1, -32, 1, -104), BackgroundColor3 = U.BASE_2, BorderSizePixel = 0, ScrollBarThickness = 6, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 22 }, root)
 	Shape.apply(grid, { radius = 6, edge = U.BORDER, thickness = 2, gradient = false })
-	Theme.make("UIGridLayout", { CellSize = UDim2.fromOffset(CARD_W, CARD_H), CellPadding = UDim2.fromOffset(8, 10), SortOrder = Enum.SortOrder.LayoutOrder }, grid)
-	Theme.make("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, grid)
+	Theme.make("UIGridLayout", { CellSize = UDim2.fromOffset(CARD_W, CARD_H), CellPadding = UDim2.fromOffset(8, 12), SortOrder = Enum.SortOrder.LayoutOrder }, grid)
+	Theme.make("UIPadding", { PaddingTop = UDim.new(0, 12), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, grid)
 	local message = Theme.label({ Text = InventoryView.LOADING, Size = UDim2.new(1, -40, 0, 30), Position = UDim2.new(0, 20, 0.5, 0), TextColor3 = W.MUTED, ZIndex = 24 }, root)
 
 	-- slide-out detail (child of root -> hides with the panel; not a separate Panel)
@@ -105,17 +106,18 @@ function InventoryUI.build(panel)
 	Theme.panel(detail, U.BORDER, Theme.Unit)
 	local dlist = Theme.make("Frame", { Position = UDim2.fromOffset(14, 14), Size = UDim2.new(1, -28, 1, -28), BackgroundTransparency = 1, ZIndex = 31 }, detail)
 	Theme.make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, dlist)
-	local tip = Theme.make("Frame", { Position = UDim2.new(1, 10, 0, 90), Size = UDim2.fromOffset(220, 90), Visible = false, ZIndex = 34 }, detail)
-	Theme.panel(tip, W.BORDER)
-	local tipName = Theme.label({ Text = "", Size = UDim2.new(1, -20, 0, 26), Position = UDim2.fromOffset(10, 8), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 }, tip)
-	local tipDesc = Theme.label({ Text = "", TextScaled = false, TextSize = 14, TextWrapped = true, Font = Theme.BODY, Size = UDim2.new(1, -20, 1, -44), Position = UDim2.fromOffset(10, 38), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 35 }, tip)
+	local tip = Theme.make("Frame", { Position = UDim2.new(1, 10, 0, 90), Size = UDim2.fromOffset(230, 110), Visible = false, ZIndex = 34 }, detail)
+	Theme.panel(tip, W.BLUE, Theme.Unit) -- dark box, thick colored border
+	Shape.iconSlot({ Name = "TraitIcon", Size = UDim2.fromOffset(24, 24), Position = UDim2.fromOffset(12, 10), ZIndex = 35 }, tip)
+	local tipName = Theme.label({ Text = "", Size = UDim2.new(1, -54, 0, 26), Position = UDim2.fromOffset(42, 9), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 }, tip)
+	local tipDesc = Theme.label({ Text = "", TextScaled = false, TextSize = 20, TextWrapped = true, Font = Theme.FONT, TextColor3 = U.MUTED, Size = UDim2.new(1, -20, 1, -44), Position = UDim2.fromOffset(12, 40), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 35 }, tip)
 
 	-- View mode: replaces the grid content (Back returns)
 	local view = Theme.make("Frame", { Position = UDim2.fromOffset(16, 56), Size = UDim2.new(1, -32, 1, -72), BackgroundTransparency = 1, Visible = false, ZIndex = 22 }, root)
 
 	local render
 	local function showGrid(on)
-		header.Visible, grid.Visible = on, on
+		header.Visible, headerKey.Visible, grid.Visible = on, on, on
 		view.Visible = not on
 		if not on then
 			detail.Visible, message.Visible = false, false
@@ -181,7 +183,7 @@ function InventoryUI.build(panel)
 			tipOpen = on and m.trait ~= nil
 			tip.Visible = tipOpen
 			if m.trait then
-				tipName.Text, tipName.TextColor3 = m.trait.name, W.YELLOW
+				tipName.Text, tipName.TextColor3 = m.trait.name, W.BLUE
 				tipDesc.Text = m.trait.desc
 			end
 		end
@@ -222,7 +224,7 @@ function InventoryUI.build(panel)
 			return
 		end
 		local vm = InventoryView.cards(decode(), Units.get, Traits.byId)
-		header.Text = vm.header
+		header.Text = vm.header:gsub("^Units: ", "")
 		message.Text = vm.message or ""
 		message.Visible = vm.message ~= nil
 		clear(grid)
@@ -235,27 +237,28 @@ function InventoryUI.build(panel)
 				found = card
 			end
 			local c = Theme.make("TextButton", { Text = "", AutoButtonColor = false, LayoutOrder = i, ZIndex = 23 }, grid)
-			Shape.apply(c, { radius = 8, fill = U.BASE, transparency = 0, edge = isSel and Color3.new(1, 1, 1) or rc, thickness = isSel and 4 or 3 })
+			Shape.apply(c, { radius = 8, fill = U.BASE, transparency = 0, edge = isSel and Color3.new(1, 1, 1) or rc, thickness = isSel and 5 or 4 })
 			Shape.glow(c, rc)
+			-- portrait fills the card (inset inside the border); text overlays it
 			local vp = Card.portrait(def, c)
-			vp.Size, vp.Position, vp.ZIndex = UDim2.new(1, -8, 0, 70), UDim2.fromOffset(4, 4), 24
-			Shape.apply(vp, { radius = 6, edge = U.BORDER, thickness = 2, gradient = false })
-			Theme.label({ Text = card.levelText, Size = UDim2.fromOffset(46, 16), Position = UDim2.fromOffset(6, 6), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = W.YELLOW, ZIndex = 26 }, c)
+			vp.Size, vp.Position, vp.ZIndex = UDim2.new(1, -8, 1, -8), UDim2.fromOffset(4, 4), 24
+			Shape.apply(vp, { radius = 6, edge = U.BORDER, thickness = 1, gradient = false })
+			Theme.label({ Text = 'Lv. <font color="#FFCE3C">' .. card.level .. "</font>", RichText = true, Size = UDim2.fromOffset(60, 18), Position = UDim2.fromOffset(8, 6), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 26 }, c)
 			if card.equipped then
-				-- equipped marker: drawn check-style chip (text, no emoji)
-				local e = Theme.label({ Text = "E", Size = UDim2.fromOffset(18, 18), Position = UDim2.new(1, -22, 0, 4), BackgroundTransparency = 0, BackgroundColor3 = W.GREEN, ZIndex = 26 }, c)
-				Shape.apply(e, { radius = 4, fill = W.GREEN, transparency = 0, edge = Theme.darkEdge(W.GREEN), thickness = 2, gradient = false })
+				-- equipped marker overhangs the top-right corner (text chip, no emoji)
+				local e = Theme.label({ Text = "E", Size = UDim2.fromOffset(22, 22), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -8, 0, 6), BackgroundTransparency = 0, BackgroundColor3 = W.GREEN, ZIndex = 28 }, c)
+				Shape.apply(e, { radius = 5, fill = W.GREEN, transparency = 0, edge = Theme.darkEdge(W.GREEN), thickness = 3, gradient = false })
 				Shape.tooltip(e, "Equipped", W.GREEN)
 			end
 			if locks.isLocked(card.uid) then
-				Theme.label({ Text = "LOCKED", Size = UDim2.fromOffset(50, 14), Position = UDim2.new(0, 6, 0, 58), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = W.YELLOW, ZIndex = 26 }, c)
+				Theme.label({ Text = "LOCKED", Size = UDim2.fromOffset(50, 14), Position = UDim2.new(1, -56, 0, 28), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = W.YELLOW, ZIndex = 26 }, c)
 			end
-			local ts = Theme.make("Frame", { Size = UDim2.fromOffset(18, 18), Position = UDim2.new(1, -24, 0, 54), BackgroundColor3 = Theme.OUTLINE, ZIndex = 26 }, c)
+			local ts = Theme.make("Frame", { Size = UDim2.fromOffset(20, 20), Position = UDim2.fromOffset(6, 28), BackgroundColor3 = Theme.OUTLINE, ZIndex = 26 }, c)
 			Shape.apply(ts, { radius = 4, edge = card.trait and W.YELLOW or U.BORDER, thickness = 2, gradient = false })
 			Shape.iconSlot({ Size = UDim2.new(1, -6, 1, -6), Position = UDim2.fromOffset(3, 3), ZIndex = 27 }, ts)
 			Shape.tooltip(ts, card.trait and card.trait.name or "No trait", card.trait and W.YELLOW or U.BORDER)
-			Theme.label({ Text = card.name, Size = UDim2.new(1, -8, 0, 20), Position = UDim2.new(0, 4, 1, -38), ZIndex = 25 }, c)
-			Theme.label({ Text = card.rarity, Font = Theme.BODY, Size = UDim2.new(1, -8, 0, 12), Position = UDim2.new(0, 4, 1, -16), TextColor3 = rc, ZIndex = 25 }, c)
+			-- name: big, bottom-right, over the portrait
+			Theme.label({ Text = card.name, Size = UDim2.new(1, -12, 0, 22), Position = UDim2.new(0, 6, 1, -26), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 26 }, c)
 			c.Activated:Connect(function()
 				selected = card.uid
 				render()
