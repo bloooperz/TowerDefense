@@ -351,6 +351,13 @@ function SettingsUI.init()
 	local holder = Button.new({ name = "Settings", keyAction = "settings", size = 64, color = ACCENT, onClick = SettingsUI.toggle }, screen)
 	holder.AnchorPoint = Vector2.new(0, 1)
 	holder.Position = UDim2.new(0, 16, 1, -16)
+	-- separate ScreenGui (DisplayOrder 20 > Lobby 5), so the Summon HUD-hide pass can't reach it:
+	-- hide the button while the full-screen summon view is open (it overlapped the pity box)
+	local function syncSummon()
+		holder.Visible = player:GetAttribute("SummonOpen") ~= true
+	end
+	player:GetAttributeChangedSignal("SummonOpen"):Connect(syncSummon)
+	syncSummon()
 	UIS.InputBegan:Connect(function(input)
 		Log.try("SettingsUI", "capture", onCaptureKey, input)
 	end)

@@ -130,4 +130,26 @@ return function(t)
 		t.eq(s:find("Rates.button(root", 1, true) ~= nil, true)
 		t.eq(s:find("Card.new(def, 1, cards)", 1, true), nil) -- small boxed cards gone
 	end)
+	t.test("screen: root covers full viewport incl. topbar inset; safe content below inset", function()
+		local fs = require("@lune/fs")
+		for _, inset in ipairs({ 0, 36, 58, 116 }) do -- 116 ~ 4K at 2x UI scale
+			local g = SR.screen(inset)
+			t.eq(g.root.sx, 1); t.eq(g.root.sy, 1); t.eq(g.root.oy, inset); t.eq(g.root.poy, -inset / 2)
+			t.eq(g.safe.sx, 1); t.eq(g.safe.sy, 1); t.eq(g.safe.oy, -inset); t.eq(g.safe.poy, inset)
+			-- simulated viewport H = 2160: root top = gui top(inset) + (H-inset)/2 + poy - (H)/2 ... = 0
+			local H = 2160
+			local guiH = H - inset
+			local rootH = guiH + g.root.oy
+			local rootTop = inset + guiH / 2 + g.root.poy - rootH / 2
+			t.eq(rootTop, 0); t.eq(rootTop + rootH, H)
+			t.eq(rootTop + g.safe.poy, inset) -- content starts below the topbar
+		end
+		local s = fs.readFile("src/client/Lobby/SummonUI.luau")
+		t.eq(s:find('Name = "Backdrop", BorderSizePixel = 0, Size = UDim2.fromScale(1, 1)', 1, true) ~= nil, true)
+		t.eq(s:find("GuiService:GetGuiInset()", 1, true) ~= nil, true)
+		t.eq(s:find('Name = "Safe"', 1, true) ~= nil, true)
+		t.eq(s:find('SetAttribute("SummonOpen", root.Visible)', 1, true) ~= nil, true)
+		local st = fs.readFile("src/client/Settings/SettingsUI.luau")
+		t.eq(st:find('holder.Visible = player:GetAttribute("SummonOpen") ~= true', 1, true) ~= nil, true)
+	end)
 end

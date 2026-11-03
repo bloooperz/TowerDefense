@@ -5,6 +5,7 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Units = require(Shared.Units)
@@ -253,6 +254,24 @@ function SummonUI.build(panel)
 		Toast.show(("Summoned %d: kept %d, auto-sold %d (+%d Gold)"):format(#list, kept, sold, res.back or 0), "info")
 	end
 
+	-- Full-viewport backdrop + safe-area content (see SummonReveal.screen): every non-backdrop
+	-- child of root moves into "Safe", which sits below the topbar inset.
+	local safe = Theme.make("Frame", { Name = "Safe", BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 21 }, root)
+	for _, c in ipairs(root:GetChildren()) do
+		if c:IsA("GuiObject") and c ~= bg and c ~= safe then
+			c.Parent = safe
+		end
+	end
+	local function fitScreen()
+		local g = SummonReveal.screen(GuiService:GetGuiInset().Y)
+		root.AnchorPoint = Vector2.new(0.5, 0.5)
+		root.Size = UDim2.new(g.root.sx, 0, g.root.sy, g.root.oy)
+		root.Position = UDim2.new(0.5, 0, g.root.py, g.root.poy)
+		safe.Size = UDim2.new(g.safe.sx, 0, g.safe.sy, g.safe.oy)
+		safe.Position = UDim2.new(0, 0, 0, g.safe.poy)
+	end
+	fitScreen()
+
 	-- The popup is a full-screen Active frame above the panel; while it shows, the summon row is
 	-- lifted INTO its dedicated bottom bar (bottom-right, below the band: SR.rowRect never meets
 	-- SR.bandRect) so x1/x10/x50 stay visible and clickable; it goes back on close.
@@ -270,7 +289,9 @@ function SummonUI.build(panel)
 	-- screen is open so nothing collides with it; restored exactly as it was on close.
 	local hidden = {}
 	root:GetPropertyChangedSignal("Visible"):Connect(function()
+		Players.LocalPlayer:SetAttribute("SummonOpen", root.Visible) -- SettingsUI hides its button
 		if root.Visible then
+			fitScreen() -- inset can change (topbar mode / resolution)
 			for _, c in ipairs(gui:GetChildren()) do
 				if c:IsA("GuiObject") and c ~= root and c ~= pop and c.Visible then
 					hidden[c], c.Visible = true, false

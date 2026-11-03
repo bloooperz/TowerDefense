@@ -72,6 +72,19 @@ SummonReveal.ROW_H = 56
 SummonReveal.ROW_MARGIN = 20
 SummonReveal.BTN_W = 180
 SummonReveal.BAND_SCALE = 0.62
+-- Full-screen geometry under a ScreenGui with IgnoreGuiInset = false (the Lobby gui): the root
+-- grows UP by the topbar inset so the backdrop covers the WHOLE viewport (no world strip at the
+-- top on any resolution), while a "Safe" content frame starts below the inset so title/X/buttons
+-- stay clear of the Roblox topbar. Offsets in px; all sizes are scale 1,1 plus offset.
+function SummonReveal.screen(insetTop: number?)
+	local i = math.max(0, math.floor(tonumber(insetTop) or 0))
+	local neg = 0 - i -- explicit (unary minus on i miscompiled to +i in lune's Luau here)
+	return {
+		root = { sx = 1, sy = 1, oy = i, py = 0.5, poy = neg / 2 }, -- Size (1,0,1,i), Position (0.5,0,0.5,-i/2), anchor .5,.5
+		safe = { sx = 1, sy = 1, oy = neg, poy = i }, -- Size (1,0,1,-i), Position (0,0,0,i)
+	}
+end
+
 function SummonReveal.bandRect(h)
 	local center = 0.5 * h - SummonReveal.BAR / 2
 	local half = (SummonReveal.BAND_SCALE * h - SummonReveal.BAR) / 2
