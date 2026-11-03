@@ -11,7 +11,8 @@ local UnitModels = {}
 
 UnitModels.FOLDER = { "Assets", "UnitModels" } -- under ReplicatedStorage
 
--- Part spec: { name, size = {x,y,z}, pos = {x,y,z} (center, feet at y = 0), color = key|{r,g,b}, shape? }
+-- Part spec: { name, size = {x,y,z}, pos = {x,y,z} (center, feet at y = 0), color = key|{r,g,b},
+--   rot? = {x,y,z} degrees, shape? = "wedge" (WedgePart) }
 -- Body colors per unit; "body"/"accent"/"skin"/"metal" keys resolve through the unit's palette.
 local MANNEQUIN = {
 	{ name = "LeftLeg", size = { 0.9, 2, 0.9 }, pos = { -0.5, 1, 0 }, color = "body" },
@@ -29,12 +30,38 @@ local function with(extra)
 	return out
 end
 UnitModels.PLACEHOLDERS = {
-	Basic = { -- soldier: helmet + short rifle
-		palette = { body = { 70, 90, 60 }, accent = { 96, 120, 74 }, skin = { 230, 190, 150 }, metal = { 50, 50, 55 } },
-		parts = with({
-			{ name = "Helmet", size = { 1.4, 0.5, 1.4 }, pos = { 0, 5.35, 0 }, color = "body" },
-			{ name = "Rifle", size = { 0.3, 0.3, 2.2 }, pos = { 1.4, 2.6, -1.1 }, color = "metal" },
-		}),
+	Basic = { -- original dark-haired summoner: spiky black hair, high-collar black uniform, short dark blade
+		palette = {
+			skin = { 236, 218, 204 }, hair = { 20, 20, 24 }, jacket = { 30, 30, 34 }, seam = { 58, 58, 66 },
+			pants = { 22, 22, 28 }, shoes = { 12, 12, 14 }, blade = { 60, 64, 70 }, grip = { 40, 30, 28 },
+		},
+		parts = {
+			{ name = "LeftShoe", size = { 0.95, 0.4, 1.1 }, pos = { -0.5, 0.2, -0.05 }, color = "shoes" },
+			{ name = "RightShoe", size = { 0.95, 0.4, 1.1 }, pos = { 0.5, 0.2, -0.05 }, color = "shoes" },
+			{ name = "LeftLeg", size = { 0.9, 1.6, 0.9 }, pos = { -0.5, 1.2, 0 }, color = "pants" },
+			{ name = "RightLeg", size = { 0.9, 1.6, 0.9 }, pos = { 0.5, 1.2, 0 }, color = "pants" },
+			{ name = "Torso", size = { 2, 2, 1 }, pos = { 0, 3, 0 }, color = "jacket", primary = true },
+			{ name = "Belt", size = { 2.05, 0.25, 1.05 }, pos = { 0, 2.15, 0 }, color = "seam" },
+			{ name = "Seam", size = { 0.12, 1.7, 0.05 }, pos = { 0, 3.05, -0.52 }, color = "seam" },
+			{ name = "Collar", size = { 1.5, 0.6, 1.25 }, pos = { 0, 4.15, 0.02 }, color = "jacket" },
+			{ name = "LeftArm", size = { 0.8, 1.8, 0.8 }, pos = { -1.4, 3.1, 0 }, color = "jacket" },
+			{ name = "RightArm", size = { 0.8, 1.8, 0.8 }, pos = { 1.4, 3.1, 0 }, color = "jacket" },
+			{ name = "LeftHand", size = { 0.6, 0.55, 0.6 }, pos = { -1.4, 1.93, 0 }, color = "skin" },
+			{ name = "RightHand", size = { 0.6, 0.55, 0.6 }, pos = { 1.4, 1.93, 0 }, color = "skin" },
+			{ name = "Head", size = { 1.2, 1.2, 1.2 }, pos = { 0, 4.6, 0 }, color = "skin" },
+			{ name = "HairTop", size = { 1.4, 0.4, 1.4 }, pos = { 0, 5.35, 0.02 }, color = "hair" },
+			{ name = "HairBack", size = { 1.4, 1.0, 0.3 }, pos = { 0, 4.95, 0.68 }, color = "hair" },
+			{ name = "HairLeft", size = { 0.25, 0.8, 1.3 }, pos = { -0.7, 4.95, 0.05 }, color = "hair" },
+			{ name = "HairRight", size = { 0.25, 0.8, 1.3 }, pos = { 0.7, 4.95, 0.05 }, color = "hair" },
+			{ name = "SpikeL", size = { 0.35, 0.8, 0.5 }, pos = { -0.4, 5.75, 0.1 }, rot = { 0, 0, 25 }, color = "hair", shape = "wedge" },
+			{ name = "SpikeR", size = { 0.35, 0.8, 0.5 }, pos = { 0.4, 5.7, 0.2 }, rot = { 0, 180, 25 }, color = "hair", shape = "wedge" },
+			{ name = "FringeL", size = { 0.35, 0.5, 0.25 }, pos = { -0.38, 4.95, -0.68 }, rot = { 180, 0, 10 }, color = "hair", shape = "wedge" },
+			{ name = "FringeM", size = { 0.35, 0.6, 0.25 }, pos = { 0.02, 4.9, -0.68 }, rot = { 180, 0, -5 }, color = "hair", shape = "wedge" },
+			{ name = "FringeR", size = { 0.35, 0.5, 0.25 }, pos = { 0.4, 4.95, -0.68 }, rot = { 180, 0, -12 }, color = "hair", shape = "wedge" },
+			{ name = "Handle", size = { 0.22, 0.22, 0.7 }, pos = { 1.4, 1.85, -0.25 }, rot = { -30, 0, 0 }, color = "grip" },
+			{ name = "Guard", size = { 0.6, 0.15, 0.15 }, pos = { 1.4, 1.7, -0.55 }, color = "blade" },
+			{ name = "Blade", size = { 0.1, 0.3, 2.6 }, pos = { 1.4, 1.05, -1.68 }, rot = { -30, 0, 0 }, color = "blade" },
+		},
 	},
 	Rapid = { -- twin barrels
 		palette = { body = { 160, 70, 30 }, accent = { 220, 120, 40 }, skin = { 230, 190, 150 }, metal = { 40, 40, 45 } },
@@ -138,10 +165,11 @@ local function buildPlaceholder(unitId: string): Model
 	local model = Instance.new("Model")
 	model.Name = unitId
 	for _, p in ipairs(spec.parts) do
-		local part = Instance.new("Part")
+		local part = Instance.new(p.shape == "wedge" and "WedgePart" or "Part")
 		part.Name = p.name
 		part.Size = Vector3.new(p.size[1], p.size[2], p.size[3])
-		part.CFrame = CFrame.new(p.pos[1], p.pos[2], p.pos[3])
+		local r = p.rot or { 0, 0, 0 }
+		part.CFrame = CFrame.new(p.pos[1], p.pos[2], p.pos[3]) * CFrame.Angles(math.rad(r[1]), math.rad(r[2]), math.rad(r[3]))
 		part.Color = rgb(type(p.color) == "string" and spec.palette[p.color] or p.color)
 		part.Material = Enum.Material.SmoothPlastic
 		part.TopSurface, part.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth

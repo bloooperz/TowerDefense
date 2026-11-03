@@ -27,7 +27,7 @@ return function(t)
 			t.eq(minY, 0); t.eq(primary, 1)
 			names[id] = set
 		end
-		t.eq(names.Basic.Rifle, true); t.eq(names.Rapid.BarrelL and names.Rapid.BarrelR, true); t.eq(names.Sniper.Scope, true)
+		t.eq(names.Rapid.BarrelL and names.Rapid.BarrelR, true); t.eq(names.Sniper.Scope, true)
 	end)
 	t.test("wiring: Towers/Card use the registry; no asset ids; Rojo Assets folder kept", function()
 		local tw = fs.readFile("src/server/Towers.luau")
@@ -42,5 +42,26 @@ return function(t)
 		local pj = fs.readFile("default.project.json")
 		t.eq(pj:find('"UnitModels"', 1, true) ~= nil, true); t.eq(pj:find('"$path": "src/shared"', 1, true) ~= nil, true)
 		t.eq(pj:find('"$ignoreUnknownInstances": true', 1, true) ~= nil, true)
+	end)
+	t.test("Basic placeholder: original dark-haired summoner (parts, colors, blade)", function()
+		local b = UM.PLACEHOLDERS.Basic
+		t.eq(#b.parts >= 15 and #b.parts <= 25, true)
+		local pal = b.palette
+		t.eq(pal.skin[1] >= 220 and pal.skin[2] >= 200, true) -- pale
+		t.eq(pal.hair[1] <= 30 and pal.hair[2] <= 30 and pal.hair[3] <= 30, true) -- near-black
+		t.eq(pal.jacket[1] <= 40 and pal.jacket[2] <= 40 and pal.jacket[3] <= 40, true)
+		local by, hair, wedges = {}, 0, 0
+		for _, p in ipairs(b.parts) do
+			by[p.name] = p
+			if p.color == "hair" then hair += 1 end
+			if p.shape == "wedge" then wedges += 1 end
+		end
+		t.eq(by.Head.color, "skin"); t.eq(by.LeftHand.color, "skin"); t.eq(by.RightHand.color, "skin")
+		t.eq(by.Torso.color, "jacket"); t.eq(by.Collar.color, "jacket"); t.eq(by.LeftLeg.color, "pants")
+		t.eq(by.Blade.color, "blade"); t.eq(by.Handle ~= nil and by.Guard ~= nil, true)
+		t.eq(hair >= 6, true); t.eq(wedges >= 3, true)
+		t.eq(by.Rifle, nil); t.eq(by.Helmet, nil)
+		local src = fs.readFile("src/shared/UnitModels.luau")
+		t.eq(src:find("rbxassetid", 1, true), nil); t.eq(src:find("MeshPart", 1, true), nil)
 	end)
 end
