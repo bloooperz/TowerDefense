@@ -43,30 +43,42 @@ return function(t)
 		t.eq(pj:find('"UnitModels"', 1, true) ~= nil, true); t.eq(pj:find('"$path": "src/shared"', 1, true) ~= nil, true)
 		t.eq(pj:find('"$ignoreUnknownInstances": true', 1, true) ~= nil, true)
 	end)
-	t.test("Basic placeholder: original dark-haired summoner (parts, colors, blade)", function()
+	t.test("Basic placeholder: stocky dark-haired summoner (mix, colors, proportions, blade)", function()
 		local b = UM.PLACEHOLDERS.Basic
 		t.eq(#b.parts >= 40 and #b.parts <= 70, true)
 		local pal = b.palette
-		t.eq(pal.skin[1] >= 220 and pal.skin[2] >= 200, true) -- pale
-		t.eq(pal.hair[1] <= 30 and pal.hair[2] <= 30 and pal.hair[3] <= 30, true) -- near-black
-		t.eq(pal.jacket[1] <= 40 and pal.jacket[2] <= 40 and pal.jacket[3] <= 40, true)
-		local by, hair, wedges = {}, 0, 0
+		t.eq(pal.skin[1] >= 220 and pal.skin[2] >= 200, true)
+		t.eq(table.concat(pal.hair, ","), "18,18,22"); t.eq(table.concat(pal.jacket, ","), "38,40,52")
+		t.eq(table.concat(pal.pants, ","), "28,28,34"); t.eq(table.concat(pal.trim, ","), "70,70,80")
+		t.eq(table.concat(pal.blade, ","), "110,116,126"); t.eq(pal.fuller[1] < pal.blade[1], true)
+		local by, kinds = {}, { block = 0, wedge = 0, cylinder = 0 }
+		local hx0, hx1, hy0, hy1 = math.huge, -math.huge, math.huge, -math.huge
 		for _, p in ipairs(b.parts) do
 			by[p.name] = p
-			if p.color == "hair" then hair += 1 end
-			if p.shape == "wedge" then wedges += 1 end
+			kinds[p.shape or "block"] += 1
+			if p.color == "hair" then
+				hx0, hx1 = math.min(hx0, p.pos[1]), math.max(hx1, p.pos[1])
+				hy0, hy1 = math.min(hy0, p.pos[2]), math.max(hy1, p.pos[2])
+				if p.name:find("Spike") or p.name:find("Fringe") then t.eq(p.shape, "wedge"); t.eq(p.size[2] <= 0.45, true) end
+			end
 		end
-		t.eq(by.Head.color, "skin"); t.eq(by.LeftHand.color, "skin"); t.eq(by.RightHand.color, "skin")
-		t.eq(by.Torso.color, "jacket"); t.eq(by.CollarBack.color, "jacket"); t.eq(by.LeftLeg.color, "pants")
-		t.eq(by.Blade1.color, "blade"); t.eq(by.Guard ~= nil, true)
-		t.eq(hair >= 15, true); t.eq(wedges >= 12, true)
-		local function count(prefix) local n = 0 for name in pairs(by) do if name:sub(1, #prefix) == prefix then n += 1 end end return n end
-		t.eq(count("Blade") >= 3, true); t.eq(count("Fuller") >= 3, true); t.eq(count("Wrap") >= 4, true); t.eq(count("Button") >= 3, true)
-		t.eq(by.Blade1.rot[1] ~= by.Blade3.rot[1], true) -- curved: angled segments
-		t.eq(by.Pommel ~= nil and by.Buckle ~= nil and by.Hem ~= nil and by.LeftCuff ~= nil and by.LeftPantCuff ~= nil, true)
-		t.eq(count("Collar") >= 4 and count("Fringe") >= 4 and count("SpikeBack") >= 3, true)
+		t.eq(kinds.block >= 20 and kinds.wedge >= 10 and kinds.cylinder >= 5, true)
+		t.eq(hx1 - hx0 > hy1 - hy0, true) -- hair wider than tall
+		t.eq(by.SpikeOutL1 ~= nil and by.SpikeOutR2 ~= nil, true)
+		local function span(name) return math.abs(by[name].pos[1]) + by[name].size[1] / 2 end
+		local ratio = 2 * span("LeftShoulder") / by.Belt.size[1]
+		t.eq(ratio >= 1.25 and ratio <= 1.4, true) -- shoulders ~1.3x belt
+		t.eq(by.Head.size[1] >= 1.3 and by.Head.size[1] <= 1.4, true) -- ~1.1-1.15x of 1.2
+		t.eq(by.CollarFrontL.pos[2] + by.CollarFrontL.size[2] / 2 < by.Head.pos[2] - by.Head.size[2] / 4, true) -- below mid-face
+		for _, n in ipairs({ "LapelL", "LapelR", "LeftPantCuff", "RightPantCuff" }) do t.eq(by[n].shape, "wedge") end
+		for _, n in ipairs({ "Pommel", "Buckle", "Wrap1", "Wrap2" }) do t.eq(by[n].shape, "cylinder") end
+		t.eq(by.LeftCuff.color, "trim"); t.eq(by.Hem.color, "trim"); t.eq(by.CollarEdge.color, "trim")
+		t.eq(by.Head.color, "skin"); t.eq(by.LeftHand.color, "skin"); t.eq(by.Torso.color, "jacket")
+		t.eq(by.Blade1.size[1], 0.2); t.eq(by.Guard.size[1] >= 0.8, true)
+		t.eq(by.Blade1.rot[1] ~= by.Blade3.rot[1], true); t.eq(by.Blade1.rot[2] ~= 0, true) -- curved, out to the side
 		t.eq(by.Rifle, nil); t.eq(by.Helmet, nil)
 		local src = fs.readFile("src/shared/UnitModels.luau")
 		t.eq(src:find("rbxassetid", 1, true), nil); t.eq(src:find("MeshPart", 1, true), nil)
+		t.eq(src:find("Enum.PartType.Cylinder", 1, true) ~= nil, true)
 	end)
 end
