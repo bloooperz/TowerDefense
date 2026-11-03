@@ -55,8 +55,7 @@ function SummonUI.build(panel)
 	for k = 1, 7 do
 		Theme.make("Frame", { Name = "Decor", BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(k / 8, 0.5), Size = UDim2.new(0, 10 + (k % 3) * 14, 1.6, 0), Rotation = 24, BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.93, ZIndex = 20 }, bg)
 	end
-	local floor = Theme.make("Frame", { Name = "Stage", BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.62), Size = UDim2.fromScale(0.8, 0.14), BackgroundColor3 = Color3.fromRGB(255, 200, 120), ZIndex = 20 }, bg)
-	Theme.make("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 1) }) }, floor)
+	-- (no "Stage" glow strip: it tinted the featured name/rarity plates)
 
 	local title = Theme.label({ Text = "Summon", Size = UDim2.fromOffset(320, 56), Position = UDim2.fromOffset(28, 18), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22 }, root)
 	Shape.outlineText(title, 3)
@@ -256,9 +255,17 @@ function SummonUI.build(panel)
 
 	-- Full-viewport backdrop + safe-area content (see SummonReveal.screen): every non-backdrop
 	-- child of root moves into "Safe", which sits below the topbar inset.
+	-- Panel's close X goes into the TOPBAR row (child of root, not Safe) so Roblox's stats
+	-- overlay just below the topbar can't cover it; ZIndex above everything in the screen.
+	local closeBtn
+	for _, c in ipairs(root:GetChildren()) do
+		if c:IsA("TextButton") and c.Text == "X" then
+			closeBtn = c
+		end
+	end
 	local safe = Theme.make("Frame", { Name = "Safe", BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 21 }, root)
 	for _, c in ipairs(root:GetChildren()) do
-		if c:IsA("GuiObject") and c ~= bg and c ~= safe then
+		if c:IsA("GuiObject") and c ~= bg and c ~= safe and c ~= closeBtn then
 			c.Parent = safe
 		end
 	end
@@ -269,6 +276,13 @@ function SummonUI.build(panel)
 		root.Position = UDim2.new(0.5, 0, g.root.py, g.root.poy)
 		safe.Size = UDim2.new(g.safe.sx, 0, g.safe.sy, g.safe.oy)
 		safe.Position = UDim2.new(0, 0, 0, g.safe.poy)
+		if closeBtn then
+			local x = SummonReveal.closeRect(GuiService:GetGuiInset().Y)
+			closeBtn.AnchorPoint = Vector2.new(1, 0.5)
+			closeBtn.Size = UDim2.fromOffset(x.size, x.size)
+			closeBtn.Position = UDim2.new(1, -x.right, 0, x.cy)
+			closeBtn.ZIndex = SummonReveal.CLOSE_Z
+		end
 	end
 	fitScreen()
 

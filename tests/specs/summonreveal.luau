@@ -152,4 +152,18 @@ return function(t)
 		local st = fs.readFile("src/client/Settings/SettingsUI.luau")
 		t.eq(st:find('holder.Visible = player:GetAttribute("SummonOpen") ~= true', 1, true) ~= nil, true)
 	end)
+	t.test("close X sits inside the topbar inset (above stats strip); Stage glow removed", function()
+		local fs = require("@lune/fs")
+		for _, inset in ipairs({ 36, 58, 116 }) do
+			local x = SR.closeRect(inset)
+			t.eq(x.cy, inset / 2)
+			t.eq(x.cy + x.size / 2 <= inset, true); t.eq(x.cy - x.size / 2 >= 0, true)
+		end
+		t.eq(SR.closeRect(0).cy, 28)
+		t.eq(SR.CLOSE_Z >= 100, true)
+		local s = fs.readFile("src/client/Lobby/SummonUI.luau")
+		t.eq(s:find('Name = "Stage"', 1, true), nil)
+		t.eq(s:find("c ~= closeBtn", 1, true) ~= nil, true)
+		t.eq(s:find("closeBtn.ZIndex = SummonReveal.CLOSE_Z", 1, true) ~= nil, true)
+	end)
 end

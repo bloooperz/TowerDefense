@@ -85,6 +85,19 @@ function SummonReveal.screen(insetTop: number?)
 	}
 end
 
+-- Close X in the topbar row of the full-screen view (root coords, y measured from the very top
+-- of the viewport): vertically centered in the inset, right-aligned (Roblox's topbar icons are on
+-- the left), so the stats overlay that sits just BELOW the topbar never covers it.
+SummonReveal.CLOSE_Z = 100
+function SummonReveal.closeRect(insetTop: number?)
+	local i = math.max(0, math.floor(tonumber(insetTop) or 0))
+	if i < 24 then -- no topbar: old spot
+		return { cy = 28, size = 36, right = 10 }
+	end
+	local size = math.min(36, i - 8)
+	return { cy = i / 2, size = size, right = 12 }
+end
+
 function SummonReveal.bandRect(h)
 	local center = 0.5 * h - SummonReveal.BAR / 2
 	local half = (SummonReveal.BAND_SCALE * h - SummonReveal.BAR) / 2
