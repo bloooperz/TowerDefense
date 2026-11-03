@@ -102,8 +102,8 @@ function SummonUI.build(panel)
 
 	-- Full-screen reveal popup (client display only). Sections come from shared/SummonReveal.
 	local gui = root.Parent
-	local pop = Theme.make("Frame", { Name = "SummonReveal", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(8, 6, 6), BackgroundTransparency = 0.25, Visible = false, Active = true, ZIndex = 60 }, gui)
-	local stage = Theme.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 61 }, pop)
+	local pop = Theme.make("Frame", { Name = "SummonReveal", BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(8, 6, 6), BackgroundTransparency = 0.25, Visible = false, Active = true, ZIndex = 60 }, gui)
+	local stage = Theme.make("Frame", { BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 61 }, pop)
 	local seq, list = nil, {}
 
 	local function bigBtn(text, color, parent, props)
@@ -161,7 +161,7 @@ function SummonUI.build(panel)
 		if model then
 			Spin.attach(vp, model, { autoRotate = 0.5 })
 		end
-		local col = Theme.make("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromScale(0.54, 0.45), Size = UDim2.new(0.38, 0, 0, 420), BackgroundTransparency = 1, ZIndex = 63 }, stage)
+		local col = Theme.make("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromScale(0.54, 0.45), Size = UDim2.new(0.38, 0, 0, 420), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 63 }, stage)
 		Theme.make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, col)
 		line(m.rarity, col, 1, { TextColor3 = rc, Size = UDim2.new(1, 0, 0, 30) })
 		line(m.name, col, 2, { Size = UDim2.new(1, 0, 0, 48) })
@@ -188,7 +188,7 @@ function SummonUI.build(panel)
 				chip(gr.grade, gr.label, g, i, GRADE_COLORS[gr.grade])
 			end
 		end
-		local bar = Theme.make("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -30), Size = UDim2.fromOffset(460, 50), BackgroundTransparency = 1, ZIndex = 63 }, stage)
+		local bar = Theme.make("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -30), Size = UDim2.fromOffset(460, 50), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 63 }, stage)
 		Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder }, bar)
 		Theme.label({ Text = seq.counter(), Size = UDim2.fromOffset(90, 30), LayoutOrder = 1, ZIndex = 64 }, bar)
 		bigBtn("Next  [Space]", W.YELLOW, bar, { Size = UDim2.fromOffset(170, 46), LayoutOrder = 2 }).Activated:Connect(function()
@@ -204,8 +204,8 @@ function SummonUI.build(panel)
 	end
 
 	local function showSummary()
-		local box = Theme.make("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(760, 470), ZIndex = 62 }, stage)
-		Theme.panel(box, W.BORDER)
+		-- borderless full-screen summary (no panel frame/stroke; the popup's translucent dim is the backdrop)
+		local box = Theme.make("Frame", { Name = "Summary", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -80, 1, -80), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 62 }, stage)
 		Theme.label({ Text = ("Summon results  -  %d"):format(#list), Size = UDim2.new(1, -40, 0, 32), Position = UDim2.fromOffset(20, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 63 }, box)
 		local g = grid(box, { Position = UDim2.fromOffset(16, 56), Size = UDim2.new(1, -32, 1, -128), ZIndex = 63 })
 		for i, r in ipairs(list) do

@@ -65,6 +65,8 @@ return function(t)
 		local s = fs.readFile("src/client/Lobby/SummonUI.luau")
 		t.eq(s:find('bigBtn("Close"', 1, true), nil)
 		t.eq(s:find("closeX", 1, true), nil)
+		t.eq(s:find("Theme.panel(box", 1, true), nil) -- no boxed summary frame
+		t.eq(s:find('Name = "SummonReveal", BorderSizePixel = 0', 1, true) ~= nil, true)
 		t.eq(s:find("clicks.summonClick(showing())", 1, true) ~= nil, true)
 		t.eq(s:find("row.Parent, row.Position, row.ZIndex = pop", 1, true) ~= nil, true)
 	end)
