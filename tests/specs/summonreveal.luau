@@ -166,4 +166,12 @@ return function(t)
 		t.eq(s:find("c ~= closeBtn", 1, true) ~= nil, true)
 		t.eq(s:find("closeBtn.ZIndex = SummonReveal.CLOSE_Z", 1, true) ~= nil, true)
 	end)
+	t.test("backdrop is a dim steampunk gradient (brown -> rust red -> burnt orange -> amber)", function()
+		local s = require("@lune/fs").readFile("src/client/Lobby/SummonUI.luau")
+		for _, c in ipairs({ "34, 20, 12", "78, 26, 18", "122, 54, 20", "140, 100, 30" }) do
+			t.eq(s:find("Color3.fromRGB(" .. c .. ")", 1, true) ~= nil, true)
+		end
+		t.eq(s:find("38, 14, 64", 1, true), nil) -- old purple gone
+		t.eq(s:find("BackgroundColor3 = Color3.fromRGB(255, 190, 110), BackgroundTransparency = 0.94", 1, true) ~= nil, true)
+	end)
 end

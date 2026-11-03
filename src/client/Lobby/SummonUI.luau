@@ -51,9 +51,9 @@ function SummonUI.build(panel)
 		tb.Visible = false -- replaced by the top-left title block
 	end
 	local bg = Theme.make("Frame", { Name = "Backdrop", BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 20 }, root)
-	Theme.make("UIGradient", { Rotation = 30, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(38, 14, 64)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(110, 36, 96)), ColorSequenceKeypoint.new(1, Color3.fromRGB(214, 112, 44)) }) }, bg)
+	Theme.make("UIGradient", { Rotation = 30, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(34, 20, 12)), ColorSequenceKeypoint.new(0.4, Color3.fromRGB(78, 26, 18)), ColorSequenceKeypoint.new(0.75, Color3.fromRGB(122, 54, 20)), ColorSequenceKeypoint.new(1, Color3.fromRGB(140, 100, 30)) }) }, bg)
 	for k = 1, 7 do
-		Theme.make("Frame", { Name = "Decor", BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(k / 8, 0.5), Size = UDim2.new(0, 10 + (k % 3) * 14, 1.6, 0), Rotation = 24, BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.93, ZIndex = 20 }, bg)
+		Theme.make("Frame", { Name = "Decor", BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(k / 8, 0.5), Size = UDim2.new(0, 10 + (k % 3) * 14, 1.6, 0), Rotation = 24, BackgroundColor3 = Color3.fromRGB(255, 190, 110), BackgroundTransparency = 0.94, ZIndex = 20 }, bg)
 	end
 	-- (no "Stage" glow strip: it tinted the featured name/rarity plates)
 
