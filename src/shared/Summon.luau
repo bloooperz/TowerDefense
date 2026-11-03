@@ -196,24 +196,38 @@ function Summon.apply(d, tier, banner, autoSell, deps)
 	for _ in pairs(d.units or {}) do
 		owned += 1
 	end
-	local room = Summon.checkRoom(owned, tier, (deps and deps.maxUnits) or Summon.MAX_UNITS, Summon.autoSellCoversPool(banner, autoSell))
-	if room then
-		return room
+	local cap = (deps and deps.maxUnits) or Summon.MAX_UNITS
+	if owned >= cap then
+		return ("Inventory full (%d/%d). Sell units to make room."):format(owned, cap)
 	end
-	d.gems -= cost
+	-- Roll everything first on a local pity copy (no side effects), so auto-sold rolls don't
+	-- count against the cap. Only kept units must fit: owned + kept <= cap, else reject whole.
 	local pity = d.summonPity or 0
-	local results, back = {}, 0
+	local rolls, kept = {}, 0
 	for _ = 1, tier do
 		local id, rarity
 		id, rarity, pity = Summon.roll(banner, pity, deps.rand)
-		if Summon.shouldAutoSell(rarity, autoSell) then
-			local g = Summon.SELL_GOLD[rarity] or 0
+		local sell = Summon.shouldAutoSell(rarity, autoSell)
+		if not sell then
+			kept += 1
+		end
+		table.insert(rolls, { id = id, rarity = rarity, sell = sell })
+	end
+	if owned + kept > cap then
+		return ("Not enough room: need %d free slots, you have %d"):format(kept, cap - owned)
+	end
+	-- commit
+	d.gems -= cost
+	local results, back = {}, 0
+	for _, r in ipairs(rolls) do
+		if r.sell then
+			local g = Summon.SELL_GOLD[r.rarity] or 0
 			back += g
-			table.insert(results, { unitId = id, rarity = rarity, sold = g })
+			table.insert(results, { unitId = r.id, rarity = r.rarity, sold = g })
 		else
 			local uid = deps.genUid()
-			d.units[uid] = deps.newUnit(uid, id)
-			table.insert(results, { unitId = id, rarity = rarity, uid = uid })
+			d.units[uid] = deps.newUnit(uid, r.id)
+			table.insert(results, { unitId = r.id, rarity = r.rarity, uid = uid })
 		end
 	end
 	d.gold = (d.gold or 0) + back
