@@ -3,7 +3,6 @@
 -- Data: the server's `Inventory` attribute (JSON). Layout/text decided by shared/InventoryView.
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
-local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -15,6 +14,7 @@ local UI = script.Parent.Parent.UI
 local Theme = require(UI.Theme)
 local Shape = require(UI.Shape)
 local Card = require(UI.Card)
+local Spin = require(UI.Spin)
 local Toast = require(script.Parent.Parent.Toast)
 
 local log = Log.new("Inventory")
@@ -57,29 +57,6 @@ local function bigButton(text, color, parent, order)
 	Shape.outlineText(b, 2)
 	Theme.make("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5) }, b)
 	return b
-end
-
--- Drag (mouse or touch) on `vp` spins `model` around Y.
-local function spinnable(vp, model)
-	local dragging, lastX, angle = false, 0, 0
-	local pivot = model:GetPivot()
-	vp.InputBegan:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-			dragging, lastX = true, i.Position.X
-		end
-	end)
-	UserInputService.InputChanged:Connect(function(i)
-		if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-			angle += (i.Position.X - lastX) * 0.01
-			lastX = i.Position.X
-			model:PivotTo(pivot * CFrame.Angles(0, angle, 0))
-		end
-	end)
-	UserInputService.InputEnded:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
-		end
-	end)
 end
 
 function InventoryUI.build(panel)
@@ -170,7 +147,7 @@ function InventoryUI.build(panel)
 		Shape.apply(vp, { radius = 8, edge = rarityColor(card.rarity), thickness = 3, gradient = false })
 		local model = vp:FindFirstChildWhichIsA("Model")
 		if model then
-			spinnable(vp, model)
+			Spin.attach(vp, model)
 		end
 		Theme.label({ Text = "Drag to spin", Size = UDim2.new(0.55, 0, 0, 18), Position = UDim2.new(0, 0, 1, -46), TextColor3 = W.MUTED, Font = Theme.BODY, ZIndex = 24 }, view)
 		local info = Theme.make("Frame", { Position = UDim2.new(0.55, 14, 0, 0), Size = UDim2.new(0.45, -14, 1, -50), BackgroundTransparency = 1, ZIndex = 23 }, view)

@@ -1,19 +1,22 @@
 -- Summon panel (built into the existing panels.Summon; gold circle + F already open it).
 -- Shows the current standard banner (rotates every Summon.BANNER.PERIOD s, same on every
--- server), countdown, pity, x1/x10/x50 buttons (Gems), Rates popup, and a card reveal with
--- Skip (Settings > Summon > Skip summon animation). Server does all validation/rolling.
+-- server), countdown, pity, x1/x10/x50 buttons (Gems), Rates popup, and a full-screen reveal
+-- (one unit at a time, Next/Space, Skip -> summary; Settings > Skip summon animation -> summary). Server does all validation/rolling.
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Units = require(Shared.Units)
 local Summon = require(Shared.Summon)
+local SummonReveal = require(Shared.SummonReveal)
+local Traits = require(Shared.Traits)
 local Net = require(Shared.Net)
 local Log = require(Shared.Log)
 local UI = script.Parent.Parent.UI
 local Theme = require(UI.Theme)
 local Shape = require(UI.Shape)
 local Card = require(UI.Card)
+local Spin = require(UI.Spin)
 local Rates = require(UI.Rates)
 local Toast = require(script.Parent.Parent.Toast)
 local ClientSettings = require(script.Parent.Parent.Settings.ClientSettings)
@@ -45,7 +48,7 @@ local function grid(parent, props, cell)
 end
 
 function SummonUI.build(panel)
-	panel.root.Size = UDim2.fromOffset(640, 440)
+	panel.root.Size = UDim2.fromOffset(640, 310)
 	panel.body.Visible = false
 	local root = panel.root
 
@@ -79,15 +82,6 @@ function SummonUI.build(panel)
 	end
 	Rates.button(root, { Position = UDim2.new(1, -110, 0, 212), ZIndex = 24 })
 
-	-- Reveal overlay (results). Cards pop in one by one unless skipped.
-	local reveal = Theme.make("Frame", { Size = UDim2.new(1, -40, 0, 128), Position = UDim2.fromOffset(20, 300), BackgroundColor3 = W.BASE_2, ZIndex = 22 }, root)
-	Theme.panel(reveal, W.BORDER)
-	local revealGrid = grid(reveal, { Position = UDim2.fromOffset(8, 8), Size = UDim2.new(1, -110, 1, -16) }, UDim2.fromOffset(70, 84))
-	local summary = Theme.label({ Text = "Results appear here", Size = UDim2.new(1, -110, 0, 20), Position = UDim2.fromOffset(8, 54), Font = Theme.BODY, TextColor3 = W.MUTED, ZIndex = 23 }, reveal)
-	local skip = Theme.make("TextButton", { Text = "Skip", Font = Theme.FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = W.BLUE, AutoButtonColor = false, Size = UDim2.fromOffset(86, 36), Position = UDim2.new(1, -96, 0.5, -18), Visible = false, ZIndex = 24 }, reveal)
-	Theme.button(skip, W.BLUE)
-	local token = 0
-
 	local function resultCard(r, order, parent)
 		local def = Units.get(r.unitId)
 		local c = Card.new(def, 1, parent)
@@ -95,18 +89,146 @@ function SummonUI.build(panel)
 		if r.sold then
 			local tag = Theme.make("Frame", { Size = UDim2.new(1, 0, 0, 22), Position = UDim2.new(0, 0, 0.5, -11), BackgroundColor3 = W.RED, ZIndex = 8 }, c)
 			Theme.button(tag, W.RED)
-			Theme.label({ Text = ("Auto-sold +%d"):format(r.sold), Size = UDim2.fromScale(1, 1), ZIndex = 9, Font = Theme.BODY }, tag)
+			Theme.label({ Text = ("Auto-sold +%d Gold"):format(r.sold), Size = UDim2.fromScale(1, 1), ZIndex = 9, Font = Theme.BODY }, tag)
 		end
 		return c
 	end
 
+	-- Full-screen reveal popup (client display only). Sections come from shared/SummonReveal.
+	local gui = root.Parent
+	local pop = Theme.make("Frame", { Name = "SummonReveal", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(8, 6, 6), BackgroundTransparency = 0.25, Visible = false, Active = true, ZIndex = 60 }, gui)
+	local stage = Theme.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 61 }, pop)
+	local closeX = Theme.make("TextButton", { Text = "X", Font = Theme.FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), Size = UDim2.fromOffset(40, 40), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -20, 0, 20), ZIndex = 70 }, pop)
+	Theme.button(closeX, W.RED)
+	Theme.make("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5) }, closeX)
+	local seq, list = nil, {}
+
+	local function bigBtn(text, color, parent, props)
+		local b = Theme.make("TextButton", { Text = text, Font = Theme.FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), BackgroundColor3 = color, AutoButtonColor = false, ZIndex = 66 }, parent)
+		for k, v in pairs(props) do
+			b[k] = v
+		end
+		Theme.button(b, color)
+		Shape.outlineText(b, 2)
+		Theme.make("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6) }, b)
+		return b
+	end
+	local function line(text, parent, order, props)
+		local l = Theme.label({ Text = text, Size = UDim2.new(1, 0, 0, 26), TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = order, ZIndex = 64 }, parent)
+		for k, v in pairs(props or {}) do
+			l[k] = v
+		end
+		Shape.outlineText(l, 2)
+		return l
+	end
+	local function section(title, parent, order)
+		line(title, parent, order, { TextColor3 = W.MUTED, Size = UDim2.new(1, 0, 0, 20) })
+		local row = Theme.make("Frame", { Size = UDim2.new(1, 0, 0, 52), BackgroundTransparency = 1, LayoutOrder = order + 1, ZIndex = 63 }, parent)
+		Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, row)
+		return row
+	end
+	local function chip(top, bottom, parent, order, edge)
+		local c = Theme.make("Frame", { Size = UDim2.new(1 / 3, -6, 1, 0), LayoutOrder = order, ZIndex = 64 }, parent)
+		Shape.apply(c, { radius = 6, fill = Theme.Unit.BASE, transparency = 0, edge = edge or Theme.Unit.BORDER, thickness = 3, gradient = false })
+		Theme.label({ Text = top, Size = UDim2.new(1, -8, 0, 26), Position = UDim2.fromOffset(4, 3), ZIndex = 65, TextColor3 = edge or Color3.new(1, 1, 1) }, c)
+		Theme.label({ Text = bottom, Font = Theme.BODY, TextColor3 = Theme.Unit.MUTED, Size = UDim2.new(1, -8, 0, 14), Position = UDim2.new(0, 4, 1, -18), ZIndex = 65 }, c)
+	end
+	local GRADE_COLORS = { C = Color3.fromRGB(170, 170, 180), B = W.GREEN, A = W.BLUE, S = W.YELLOW, SS = W.ORANGE, Z = Color3.fromRGB(255, 60, 120) }
+
+	local function closePop()
+		if not pop.Visible then
+			return false
+		end
+		pop.Visible = false
+		clear(stage)
+		seq, list = nil, {}
+		return true
+	end
+
+	local render
+	local function showOne(r)
+		local def = Units.get(r.unitId)
+		local m = SummonReveal.card(r, def, Traits.byId)
+		local rc = Config.RARITY_COLORS[m.rarity] or Theme.Unit.BORDER
+		-- model presented directly: transparent viewport, no card frame
+		local vp = Card.portrait(def, stage)
+		vp.BackgroundTransparency, vp.ZIndex = 1, 62
+		vp.AnchorPoint, vp.Position, vp.Size = Vector2.new(0.5, 0.5), UDim2.fromScale(0.3, 0.47), UDim2.fromScale(0.42, 0.7)
+		local model = vp:FindFirstChildWhichIsA("Model")
+		if model then
+			Spin.attach(vp, model, { autoRotate = 0.5 })
+		end
+		local col = Theme.make("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromScale(0.54, 0.45), Size = UDim2.new(0.38, 0, 0, 420), BackgroundTransparency = 1, ZIndex = 63 }, stage)
+		Theme.make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, col)
+		line(m.rarity, col, 1, { TextColor3 = rc, Size = UDim2.new(1, 0, 0, 30) })
+		line(m.name, col, 2, { Size = UDim2.new(1, 0, 0, 48) })
+		if m.soldText then
+			local tag = Theme.make("Frame", { Size = UDim2.fromOffset(220, 32), BackgroundColor3 = W.RED, LayoutOrder = 3, ZIndex = 64 }, col)
+			Theme.button(tag, W.RED)
+			Theme.label({ Text = m.soldText, Size = UDim2.new(1, -12, 1, -8), Position = UDim2.fromOffset(6, 4), ZIndex = 65 }, tag)
+		end
+		local stats = section("Base stats", col, 10)
+		for i, st in ipairs(m.stats) do
+			chip(st.value, st.label, stats, i)
+		end
+		if m.trait then
+			local t = section("Trait", col, 20)
+			local tc = Theme.make("Frame", { Size = UDim2.new(1, 0, 1, 0), ZIndex = 64 }, t)
+			Shape.apply(tc, { radius = 6, fill = Theme.Unit.BASE, transparency = 0, edge = W.BLUE, thickness = 3, gradient = false })
+			Shape.iconSlot({ Size = UDim2.fromOffset(28, 28), Position = UDim2.fromOffset(10, 12), ZIndex = 65 }, tc)
+			Theme.label({ Text = m.trait.name, Size = UDim2.new(0.4, 0, 0, 26), Position = UDim2.fromOffset(46, 13), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = W.BLUE, ZIndex = 65 }, tc)
+			Theme.label({ Text = m.trait.desc, Font = Theme.BODY, TextScaled = false, TextSize = 14, TextWrapped = true, TextColor3 = Theme.Unit.MUTED, Size = UDim2.new(0.6, -56, 1, -8), Position = UDim2.new(0.4, 50, 0, 4), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 65 }, tc)
+		end
+		if m.grades then
+			local g = section("Stat rolls", col, 30)
+			for i, gr in ipairs(m.grades) do
+				chip(gr.grade, gr.label, g, i, GRADE_COLORS[gr.grade])
+			end
+		end
+		local bar = Theme.make("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -30), Size = UDim2.fromOffset(460, 50), BackgroundTransparency = 1, ZIndex = 63 }, stage)
+		Theme.make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder }, bar)
+		Theme.label({ Text = seq.counter(), Size = UDim2.fromOffset(90, 30), LayoutOrder = 1, ZIndex = 64 }, bar)
+		bigBtn("Next  [Space]", W.YELLOW, bar, { Size = UDim2.fromOffset(170, 46), LayoutOrder = 2 }).Activated:Connect(function()
+			seq.next()
+			render()
+		end)
+		if seq.showSkip() then
+			bigBtn("Skip", W.BLUE, bar, { Size = UDim2.fromOffset(120, 46), LayoutOrder = 3 }).Activated:Connect(function()
+				seq.skip()
+				render()
+			end)
+		end
+	end
+
+	local function showSummary()
+		local box = Theme.make("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(760, 470), ZIndex = 62 }, stage)
+		Theme.panel(box, W.BORDER)
+		Theme.label({ Text = ("Summon results  -  %d"):format(#list), Size = UDim2.new(1, -40, 0, 32), Position = UDim2.fromOffset(20, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 63 }, box)
+		local g = grid(box, { Position = UDim2.fromOffset(16, 56), Size = UDim2.new(1, -32, 1, -128), ZIndex = 63 })
+		for i, r in ipairs(list) do
+			resultCard(r, i, g)
+		end
+		bigBtn("Close", W.RED, box, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.fromOffset(160, 46) }).Activated:Connect(closePop)
+	end
+
+	render = function()
+		clear(stage)
+		if not seq then
+			return
+		end
+		if seq.mode == "reveal" then
+			showOne(seq.current())
+		elseif seq.mode == "summary" then
+			showSummary()
+		else
+			closePop()
+		end
+	end
+
 	local function showResults(res)
-		token += 1
-		local my = token
-		clear(revealGrid)
-		summary.Visible = false
+		list = res.results or {}
 		local kept, sold = 0, 0
-		for _, r in ipairs(res.results or {}) do
+		for _, r in ipairs(list) do
 			if r.sold then
 				sold += 1
 			else
@@ -114,45 +236,20 @@ function SummonUI.build(panel)
 			end
 		end
 		local s = ClientSettings.get() or {}
-		local animate = not s.skipSummonAnim
-		skip.Visible = animate
-		local list = res.results or {}
-		local placed = 0
-		local function finish()
-			for i = placed + 1, #list do
-				resultCard(list[i], i, revealGrid)
-			end
-			placed = #list
-			skip.Visible = false
-			Toast.show(("Summoned %d: kept %d, auto-sold %d (+%d Gold)"):format(#list, kept, sold, res.back or 0), "info")
-		end
-		if not animate then
-			finish()
-			return
-		end
-		task.spawn(function()
-			for i, r in ipairs(list) do
-				if token ~= my or placed >= #list then
-					return
-				end
-				local c = resultCard(r, i, revealGrid)
-				placed = i
-				local sc = Theme.make("UIScale", { Scale = 0.2 }, c)
-				TweenService:Create(sc, TweenInfo.new(0.18, Enum.EasingStyle.Back), { Scale = 1 }):Play()
-				local rk = Summon.rank(r.rarity)
-				task.wait(rk >= Summon.rank("Epic") and 0.45 or 0.12)
-			end
-			if token == my then
-				finish()
-			end
-		end)
-		skip.Activated:Once(function()
-			if token == my and placed < #list then
-				token += 1 -- stop the animation loop
-				finish()
-			end
-		end)
+		seq = SummonReveal.sequence(list, s.skipSummonAnim == true)
+		pop.Visible = seq.mode ~= "empty"
+		render()
+		Toast.show(("Summoned %d: kept %d, auto-sold %d (+%d Gold)"):format(#list, kept, sold, res.back or 0), "info")
 	end
+
+	closeX.Activated:Connect(closePop)
+	panel.onEsc = closePop -- Esc closes the reveal first, then the panel
+	UserInputService.InputBegan:Connect(function(i, gpe)
+		if not gpe and i.KeyCode == Enum.KeyCode.Space and pop.Visible and seq and seq.mode == "reveal" then
+			seq.next()
+			Log.try("SummonUI", "reveal next", render)
+		end
+	end)
 
 	Net.listen("SummonResult", function(res)
 		busy = false
